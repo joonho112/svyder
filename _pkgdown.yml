@@ -27,6 +27,7 @@ reference:
       - summary.svyder
       - tidy.svyder
       - glance.svyder
+      - as.matrix.svyder
 
   - title: Visualization
     contents:
