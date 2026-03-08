@@ -1,0 +1,13 @@
+pandoc: 3.1.11
+pkgdown: 2.2.0
+pkgdown_sha: ~
+articles:
+  case-study-nsece: case-study-nsece.html
+  decomposition-theorems: decomposition-theorems.html
+  getting-started: getting-started.html
+  pipeline-in-depth: pipeline-in-depth.html
+  understanding-der: understanding-der.html
+last_built: 2026-03-08T05:31Z
+urls:
+  reference: https://joonho112.github.io/svyder/reference
+  article: https://joonho112.github.io/svyder/articles
