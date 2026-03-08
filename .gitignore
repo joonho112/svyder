@@ -1,0 +1,22 @@
+# R user files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# macOS
+.DS_Store
+
+# pkgdown site (build via CI)
+docs/
+
+# Built vignettes
+doc/
+Meta/
+
+# Rendered README
+README.html
+
+# R package build artifacts
+*.tar.gz
+*.Rcheck/

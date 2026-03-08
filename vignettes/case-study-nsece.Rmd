@@ -1,0 +1,884 @@
+---
+title: "Case Study: NSECE Survey Data Analysis"
+author: "JoonHo Lee"
+date: "`r Sys.Date()`"
+description: >
+  A comprehensive case study demonstrating the full DER diagnostic workflow on
+  NSECE-like survey data: explore the survey design, run diagnostics, interpret
+  fixed and random effect results, verify decomposition theorems, compare
+  selective vs blanket correction, and report results for publication.
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Case Study: NSECE Survey Data Analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+library(svyder)
+knitr::opts_chunk$set(
+  collapse  = TRUE,
+  comment   = "#>",
+  fig.width  = 7,
+  fig.height = 5,
+  fig.align  = "center",
+  out.width  = "85%"
+)
+set.seed(42)
+
+# Project colour palette
+pal <- c(
+  tier_ia    = "#D6604D",
+  tier_ib    = "#4393C3",
+  tier_ii    = "#1B7837",
+  threshold  = "#762A83"
+)
+```
+
+## Overview
+
+This vignette walks through a complete DER analysis on the `nsece_demo`
+dataset, a synthetic dataset modeled after the 2019 National Survey of Early
+Care and Education (NSECE). By the end, you will be able to:
+
+1. **Complete a full DER workflow** from data exploration through selective
+   correction.
+2. **Interpret design effects** in the context of early childhood policy
+   research.
+3. **Diagnose which parameters** are design-sensitive and explain why using
+   the decomposition theorems.
+4. **Apply selective correction** and compare it with naive and blanket
+   alternatives.
+5. **Report DER results** in a publication-ready format.
+
+The analysis proceeds in seven stages: explore the survey design, run the
+diagnostic, interpret fixed and random effects, verify the decomposition
+theorems and conservation law, compare correction strategies, assess
+sensitivity to the threshold, and format results for publication.
+
+
+## Background: The NSECE Survey
+
+The National Survey of Early Care and Education (NSECE), administered by the
+U.S. Department of Health and Human Services, is the primary data source for
+understanding the nation's childcare landscape. The 2019 wave surveyed
+childcare providers across all 50 states plus the District of Columbia using a
+complex multi-stage design:
+
+- **Stratification** by state ensures adequate representation of each
+  jurisdiction.
+- **Cluster sampling** within states (primary sampling units, PSUs) captures
+  geographic correlation.
+- **Unequal selection probabilities** oversample small states and rare
+  provider types.
+
+The resulting survey weights can vary by a factor of 10 or more, producing
+a substantial Kish design effect. The `nsece_demo` dataset is a synthetic
+analog that preserves these structural features.
+
+```{r load-data}
+data(nsece_demo)
+```
+
+| Feature | Value |
+|:--------|:------|
+| Observations (N) | `r nsece_demo$N` |
+| States (J) | `r nsece_demo$J` |
+| Fixed effects (p) | `r nsece_demo$p` |
+| Posterior draws | `r nrow(nsece_demo$draws)` |
+| Parameters (d = p + J) | `r ncol(nsece_demo$draws)` |
+| Family | `r nsece_demo$family` |
+
+
+## The Research Question
+
+The model examines a binary outcome: whether each childcare provider
+participates in the state's Infant-Toddler (IT) quality improvement system.
+Three fixed-effect covariates enter the hierarchical logistic regression:
+
+- $\beta_0$ (intercept): overall log-odds of IT system participation.
+- $\beta_1$ (`poverty_cwc`): provider-level poverty, centered within each
+  state. This is a **within-cluster** covariate: it varies across providers
+  within the same state.
+- $\beta_2$ (`tiered_reim`): a binary indicator for whether the state
+  operates a tiered reimbursement policy. This is a **between-cluster**
+  covariate: it takes a single value for all providers in a given state.
+
+In addition, the model includes 51 state-level random effects
+$\theta_1, \ldots, \theta_{51}$, for a total of 54 parameters.
+
+The DER analysis will reveal which of these 54 parameters are sensitive to
+the survey design and which are protected by the hierarchical structure.
+
+```{r param-types}
+nsece_demo$param_types
+```
+
+
+## Exploring the Survey Design
+
+Before running the DER diagnostic, it is instructive to examine the survey
+design features that drive the design effect.
+
+### Survey weight distribution
+
+```{r weight-summary}
+w <- nsece_demo$weights
+cat(sprintf("Weight range:  [%.2f, %.2f]\n", min(w), max(w)))
+cat(sprintf("Weight CV:      %.3f\n", sd(w) / mean(w)))
+cat(sprintf("Kish DEFF:      %.3f\n", 1 + (sd(w) / mean(w))^2))
+```
+
+The coefficient of variation of the weights is substantial, yielding a Kish
+design effect well above 1. This DEFF quantifies the information loss from
+unequal weighting: an effective sample size of $N / \text{DEFF}$ rather than
+$N$.
+
+```{r fig-weights, fig.height = 4, fig.cap = "Distribution of survey weights in the NSECE-like dataset. The rightward tail indicates oversampled observations (e.g., small-state providers), which inflate the design effect."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  wt_df <- data.frame(weight = w)
+  cv_w  <- sd(w) / mean(w)
+  deff  <- 1 + cv_w^2
+
+  ggplot(wt_df, aes(x = weight)) +
+    geom_histogram(bins = 40, fill = pal["tier_ib"], colour = "white",
+                   linewidth = 0.3, alpha = 0.85) +
+    geom_vline(xintercept = mean(w), linetype = "dashed",
+               colour = pal["threshold"], linewidth = 0.8) +
+    annotate("text", x = mean(w) * 1.15, y = Inf, vjust = 1.5,
+             label = sprintf("mean = %.2f", mean(w)),
+             colour = pal["threshold"], size = 4, fontface = "italic") +
+    annotate("text", x = max(w) * 0.7, y = Inf, vjust = 3,
+             label = sprintf("DEFF = %.2f", deff),
+             colour = pal["tier_ia"], size = 5, fontface = "bold") +
+    labs(x = "Survey weight", y = "Count",
+         title = "Survey Weight Distribution") +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank())
+}
+```
+
+### PSU structure
+
+Each state contains multiple PSUs. The number of PSUs per state affects the
+precision of the cluster-robust variance estimate.
+
+```{r psu-structure}
+psu_per_state <- tapply(nsece_demo$psu, nsece_demo$group,
+                        function(x) length(unique(x)))
+cat(sprintf("PSUs per state: min = %d, median = %.0f, max = %d\n",
+            min(psu_per_state), median(psu_per_state), max(psu_per_state)))
+cat(sprintf("Total PSUs:     %d\n", length(unique(nsece_demo$psu))))
+```
+
+### Group sizes
+
+```{r group-sizes}
+n_j <- table(nsece_demo$group)
+cat(sprintf("Providers per state: min = %d, median = %.0f, max = %d\n",
+            min(n_j), median(n_j), max(n_j)))
+```
+
+The variation in group sizes means that the shrinkage factor $B_j$ will
+differ across states: larger states experience less shrinkage (their data
+dominate the prior), while smaller states are pulled more strongly toward
+the grand mean.
+
+
+## Running the DER Diagnostic
+
+The full DER pipeline --- compute, classify, correct --- runs in a single
+call to `der_diagnose()`:
+
+```{r diagnose}
+result <- der_diagnose(
+  x           = nsece_demo$draws,
+  y           = nsece_demo$y,
+  X           = nsece_demo$X,
+  group       = nsece_demo$group,
+  weights     = nsece_demo$weights,
+  psu         = nsece_demo$psu,
+  family      = nsece_demo$family,
+  sigma_theta = nsece_demo$sigma_theta,
+  param_types = nsece_demo$param_types,
+  tau         = 1.2
+)
+```
+
+### Print output
+
+The `print()` method provides a concise summary of the diagnosis:
+
+```{r print-result}
+result
+```
+
+Out of 54 parameters, only 1 exceeds the threshold $\tau = 1.2$. The
+diagnostic immediately identifies the within-state poverty coefficient as the
+sole parameter requiring design-based correction.
+
+### Summary output
+
+The `summary()` method displays the full classification table:
+
+```{r summary-result}
+summary(result)
+```
+
+### Model-level summary
+
+The `glance()` method returns a one-row data frame suitable for reporting:
+
+```{r glance-result}
+glance.svyder(result)
+```
+
+
+## Understanding the Fixed Effects
+
+The three fixed effects illustrate the three-tier classification in action.
+
+```{r fe-der}
+td <- tidy.svyder(result)
+fe <- td[1:3, c("term", "estimate", "std.error", "der", "tier", "action")]
+fe
+```
+
+The DER values span nearly two orders of magnitude:
+
+- **$\beta_1$ (intercept)**: DER well below 1.0. This between-cluster
+  parameter draws its information from between-state comparisons. The
+  hierarchical prior absorbs much of the design effect through shrinkage.
+  Classification: **Tier I-b** (protected; do not correct).
+
+- **$\beta_2$ (poverty\_cwc)**: DER substantially above 1.0. This
+  within-cluster covariate is identified from variation among providers
+  *within* the same state. The random effects cannot absorb intra-cluster
+  correlation at this level, so the full design effect passes through.
+  Classification: **Tier I-a** (exposed; correct).
+
+- **$\beta_3$ (tiered\_reim)**: DER well below 1.0. Like the intercept, this
+  between-cluster policy indicator is identified from between-state
+  differences and is substantially protected by hierarchical shrinkage.
+  Classification: **Tier I-b** (protected; do not correct).
+
+The 100-fold difference in DER between $\beta_2$ and the other fixed effects
+is not an anomaly --- it is the predicted consequence of the decomposition
+theorem. The information source determines design sensitivity.
+
+### Visualizing the fixed effects
+
+```{r fig-fe-profile, fig.height = 4, fig.cap = "DER profile for the three fixed effects. The within-state poverty coefficient (red, Tier I-a) is the only parameter exceeding the threshold (dashed purple line). The between-state parameters (blue, Tier I-b) are protected by hierarchical shrinkage."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  fe_plot <- data.frame(
+    param = c("Intercept", "Poverty (CWC)", "Tiered Reim."),
+    der   = td$der[1:3],
+    tier  = td$tier[1:3]
+  )
+  fe_plot$param <- factor(fe_plot$param, levels = fe_plot$param)
+
+  tier_colors <- c("I-a" = unname(pal["tier_ia"]),
+                   "I-b" = unname(pal["tier_ib"]),
+                   "II"  = unname(pal["tier_ii"]))
+
+  ggplot(fe_plot, aes(x = param, y = der, colour = tier)) +
+    geom_hline(yintercept = 1.2, linetype = "dashed",
+               colour = pal["threshold"], linewidth = 0.7) +
+    geom_point(size = 4) +
+    geom_segment(aes(xend = param, y = 0, yend = der), linewidth = 0.8) +
+    scale_colour_manual(values = tier_colors, name = "Tier") +
+    annotate("text", x = 3.3, y = 1.2, label = expression(tau == 1.2),
+             colour = pal["threshold"], size = 3.5, vjust = -0.5) +
+    labs(x = NULL, y = "Design Effect Ratio",
+         title = "Fixed Effect DER Values") +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "bottom")
+}
+```
+
+
+## Understanding the Random Effects
+
+All 51 state random effects fall into Tier II (protected). Their DER values
+are consistently below 1.0.
+
+```{r re-der}
+re <- td[td$tier == "II", ]
+cat(sprintf("Random effect DER: min = %.4f, mean = %.4f, max = %.4f\n",
+            min(re$der), mean(re$der), max(re$der)))
+cat(sprintf("All below threshold: %s\n",
+            ifelse(all(re$der < 1.2), "yes", "no")))
+```
+
+### Caterpillar plot of state DER values
+
+```{r fig-re-caterpillar, fig.height = 6, fig.cap = "DER values for 51 state random effects, ordered by magnitude. All values fall well below the threshold (dashed purple line), confirming that hierarchical shrinkage protects the random effects from design-induced distortion. States with larger groups (weaker shrinkage) show slightly higher DER values."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  re_plot <- re[order(re$der), ]
+  re_plot$rank <- seq_len(nrow(re_plot))
+  state_labels <- gsub("theta\\[|\\]", "", re_plot$term)
+  re_plot$state_label <- paste0("State ", state_labels)
+
+  ggplot(re_plot, aes(x = der, y = reorder(state_label, der))) +
+    geom_vline(xintercept = 1.2, linetype = "dashed",
+               colour = pal["threshold"], linewidth = 0.7) +
+    geom_vline(xintercept = 1.0, linetype = "dotted",
+               colour = "grey50", linewidth = 0.5) +
+    geom_point(colour = pal["tier_ii"], size = 1.8) +
+    labs(x = "Design Effect Ratio", y = NULL,
+         title = "State Random Effect DER Values") +
+    theme_minimal(base_size = 10) +
+    theme(panel.grid.minor = element_blank(),
+          axis.text.y = element_text(size = 6))
+}
+```
+
+### Shrinkage and DER: why random effects are protected
+
+The DER for a random effect is approximately $B_j \times \text{DEFF}_j
+\times \kappa_j(J)$, where $B_j$ is the group-specific shrinkage factor.
+Since $B_j < 1$ for all groups, the prior directly attenuates the design
+effect before it reaches the posterior.
+
+```{r fig-B-vs-DER, fig.height = 4.5, fig.cap = "Relationship between the shrinkage factor B_j and DER for 51 state random effects. Each point is one state, colored by its per-group design effect (DEFF_j). States with larger B (less shrinkage) show higher DER, but even the least-shrunk states remain well below 1.0."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  re_diag <- data.frame(
+    B_j    = result$B_j,
+    deff_j = result$deff_j,
+    der    = td$der[4:54]
+  )
+
+  ggplot(re_diag, aes(x = B_j, y = der, colour = deff_j)) +
+    geom_point(size = 2.5, alpha = 0.8) +
+    scale_colour_gradient(low = pal["tier_ib"], high = pal["tier_ia"],
+                          name = expression(DEFF[j])) +
+    geom_hline(yintercept = 1.0, linetype = "dotted",
+               colour = "grey50", linewidth = 0.5) +
+    labs(x = expression("Shrinkage factor" ~ B[j]),
+         y = "Design Effect Ratio",
+         title = "Shrinkage vs. DER for State Random Effects") +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "right")
+}
+```
+
+
+## Decomposition Analysis
+
+The `der_decompose()` function reveals the constituent factors behind each
+parameter's DER value.
+
+```{r decompose}
+decomp <- der_decompose(result)
+```
+
+### Fixed effect decomposition
+
+For fixed effects, $\text{DER}_{\beta_k} = \text{DEFF} \times (1 - R_k)$,
+where $R_k$ measures the fraction of identifying variation from
+between-group differences:
+
+```{r decompose-fe}
+decomp[decomp$param_type != "re",
+       c("param", "param_type", "der", "deff_mean", "R_k", "der_predicted")]
+```
+
+The within-cluster poverty covariate has $R_k \approx 0$: nearly all its
+identifying variation comes from within-state differences, so the full DEFF
+passes through. The between-cluster parameters have $R_k$ close to $B$,
+confirming that the hierarchical structure absorbs much of the design effect.
+
+### Random effect decomposition
+
+For random effects, $\text{DER}_j = B_j \times \text{DEFF}_j \times
+\kappa_j(J)$:
+
+```{r decompose-re}
+re_decomp <- decomp[decomp$param_type == "re",
+                    c("param", "der", "B_mean", "deff_mean",
+                      "kappa", "der_predicted")]
+head(re_decomp, 10)
+```
+
+### Built-in decomposition plot
+
+The built-in decomposition plot compares observed DER values against their
+predicted values from the decomposition formulas:
+
+```{r fig-decomposition, fig.cap = "DER decomposition: observed versus predicted values. Points near the diagonal indicate good agreement between the theoretical formulas and the full sandwich computation. The fixed effect outlier is the within-cluster poverty covariate."}
+plot(result, type = "decomposition")
+```
+
+
+## The Conservation Law in Action
+
+An elegant structural property of the DER framework is the conservation
+law: in the balanced case,
+
+$$\text{DER}_\mu + \text{DER}_\theta^{\text{cond}} = \text{DEFF}.$$
+
+The hierarchical prior does not create or destroy design sensitivity. It
+*redistributes* it. Every unit of design sensitivity removed from the random
+effects reappears in the fixed effects (specifically the grand mean).
+
+```{r conservation}
+thm_check <- der_theorem_check(result)
+
+conservation <- attr(thm_check, "conservation_law")
+if (!is.null(conservation)) {
+  cat(sprintf("DER_mu (intercept)       = %.4f\n", conservation$der_mu))
+  cat(sprintf("DER_theta (mean RE)      = %.4f\n", conservation$der_theta_mean))
+  cat(sprintf("Sum                      = %.4f\n", conservation$conservation_sum))
+  cat(sprintf("Mean DEFF                = %.4f\n", conservation$deff_mean))
+  cat(sprintf("Relative error           = %.4f\n", conservation$relative_error))
+}
+```
+
+The conservation law holds approximately because the NSECE-like data has
+unequal group sizes. The relative error quantifies the discrepancy; in
+practice, errors below 0.20 indicate that the balanced-case approximation
+provides useful intuition.
+
+### Visualizing the design sensitivity budget
+
+```{r fig-conservation, fig.height = 4, fig.cap = "The design sensitivity budget. The total DEFF is partitioned between the grand mean (DER_mu) and the random effects (mean DER_theta). The prior transfers sensitivity from the random effects to the grand mean, but the total budget is approximately conserved."}
+if (requireNamespace("ggplot2", quietly = TRUE) && !is.null(conservation)) {
+  library(ggplot2)
+
+  budget_df <- data.frame(
+    component = c("Grand mean\n(DER_mu)",
+                  "Random effects\n(mean DER_theta)"),
+    value     = c(conservation$der_mu, conservation$der_theta_mean)
+  )
+  budget_df$component <- factor(budget_df$component,
+                                levels = budget_df$component)
+
+  ggplot(budget_df, aes(x = "DEFF Budget", y = value, fill = component)) +
+    geom_col(width = 0.5, colour = "white", linewidth = 0.5) +
+    geom_hline(yintercept = conservation$deff_mean, linetype = "dashed",
+               colour = pal["threshold"], linewidth = 0.8) +
+    annotate("text", x = 1.4, y = conservation$deff_mean,
+             label = sprintf("DEFF = %.2f", conservation$deff_mean),
+             colour = pal["threshold"], size = 4, fontface = "italic",
+             hjust = 0) +
+    scale_fill_manual(values = c(pal["tier_ib"], pal["tier_ii"]),
+                      name = "Component") +
+    labs(x = NULL, y = "Design Effect Ratio",
+         title = "Conservation of Design Sensitivity") +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_blank(),
+          legend.position = "right")
+}
+```
+
+
+## Selective vs. Blanket Correction
+
+The central practical contribution of the DER framework is **selective
+correction**: adjusting only the flagged parameters while leaving the rest
+untouched. This section compares selective correction with two alternatives:
+naive (no correction) and blanket (correct everything).
+
+### Extracting corrected draws
+
+```{r corrected-draws}
+draws_corrected <- as.matrix(result)
+draws_original  <- result$original_draws
+
+cat(sprintf("Draws matrix: %d draws x %d parameters\n",
+            nrow(draws_corrected), ncol(draws_corrected)))
+```
+
+### Credible intervals for the flagged parameter
+
+The within-state poverty coefficient ($\beta_2$) is the only flagged
+parameter. Compare its naive and corrected credible intervals:
+
+```{r ci-comparison}
+# 95% credible intervals for the flagged parameter (column 2)
+ci_naive     <- quantile(draws_original[, 2],  probs = c(0.025, 0.975))
+ci_corrected <- quantile(draws_corrected[, 2], probs = c(0.025, 0.975))
+
+width_naive     <- diff(ci_naive)
+width_corrected <- diff(ci_corrected)
+width_ratio     <- width_corrected / width_naive
+
+cat(sprintf("Naive CI:     [%.3f, %.3f]  (width = %.3f)\n",
+            ci_naive[1], ci_naive[2], width_naive))
+cat(sprintf("Corrected CI: [%.3f, %.3f]  (width = %.3f)\n",
+            ci_corrected[1], ci_corrected[2], width_corrected))
+cat(sprintf("Width ratio:  %.1f%%\n", width_ratio * 100))
+```
+
+The correction widens the interval, reflecting the additional uncertainty
+from the survey design that the naive model-based posterior failed to
+capture.
+
+### Unflagged parameters are unchanged
+
+A critical property of selective correction is that unflagged parameters
+retain their original draws:
+
+```{r unchanged-check}
+# Check that unflagged columns are identical
+unflagged_cols <- which(result$scale_factors == 1.0)
+all_identical  <- all(draws_corrected[, unflagged_cols] ==
+                      draws_original[, unflagged_cols])
+cat(sprintf("Unflagged parameters unchanged: %s (%d of %d parameters)\n",
+            all_identical, length(unflagged_cols), ncol(draws_corrected)))
+```
+
+### The blanket correction problem
+
+What would happen if we applied blanket correction to all 54 parameters? We
+can assess this by examining the scale factors that *would* be applied:
+
+```{r blanket-hypothetical}
+# Hypothetical blanket scale factors: sqrt(DER) for all parameters
+blanket_sf <- sqrt(td$der)
+
+# For DER < 1, blanket correction would NARROW the posterior
+n_narrowed   <- sum(td$der < 1.0)
+n_widened    <- sum(td$der > 1.0)
+n_unchanged  <- sum(td$der == 1.0)
+
+cat(sprintf("Blanket correction would:\n"))
+cat(sprintf("  Widen:   %d parameters (DER > 1)\n", n_widened))
+cat(sprintf("  Narrow:  %d parameters (DER < 1)\n", n_narrowed))
+
+# Worst case: how much would the most-protected RE shrink?
+min_sf <- min(blanket_sf)
+cat(sprintf("\nSmallest scale factor: %.4f\n", min_sf))
+cat(sprintf("That RE's CI would shrink to %.1f%% of original width\n",
+            min_sf * 100))
+```
+
+Blanket correction would inappropriately narrow the credible intervals of
+53 parameters. For the most-protected random effects, the interval would
+collapse to a fraction of its original width, destroying the precision gains
+from hierarchical shrinkage.
+
+### Built-in comparison plot
+
+```{r fig-comparison, fig.height = 3.5, fig.cap = "Credible interval comparison for the flagged parameter (poverty_cwc). Gray shows the naive model-based interval; the colored interval shows the DER-corrected interval. The correction appropriately widens the interval to account for the survey design."}
+plot(result, type = "comparison")
+```
+
+### Custom CI comparison across all fixed effects
+
+```{r fig-ci-custom, fig.height = 4, fig.cap = "Fixed-effect credible intervals: naive (gray) vs. selectively corrected (colored). Only the within-state poverty coefficient changes; the between-state parameters are left untouched."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  fe_names <- c("Intercept", "Poverty (CWC)", "Tiered Reim.")
+  ci_list  <- lapply(1:3, function(k) {
+    naive_ci <- quantile(draws_original[, k],  probs = c(0.025, 0.50, 0.975))
+    corr_ci  <- quantile(draws_corrected[, k], probs = c(0.025, 0.50, 0.975))
+    data.frame(
+      param  = fe_names[k],
+      type   = c("Naive", "Corrected"),
+      lo     = c(naive_ci[1], corr_ci[1]),
+      mid    = c(naive_ci[2], corr_ci[2]),
+      hi     = c(naive_ci[3], corr_ci[3]),
+      stringsAsFactors = FALSE
+    )
+  })
+  ci_df <- do.call(rbind, ci_list)
+  ci_df$param <- factor(ci_df$param, levels = rev(fe_names))
+  ci_df$type  <- factor(ci_df$type, levels = c("Naive", "Corrected"))
+
+  ggplot(ci_df, aes(x = mid, y = param, colour = type)) +
+    geom_vline(xintercept = 0, linetype = "dashed",
+               colour = "grey60", linewidth = 0.5) +
+    geom_pointrange(aes(xmin = lo, xmax = hi),
+                    position = position_dodge(width = 0.4),
+                    size = 0.5, linewidth = 0.7) +
+    scale_colour_manual(
+      values = c(Naive = "grey55", Corrected = pal["tier_ia"]),
+      name = "Estimate"
+    ) +
+    labs(x = "Coefficient value", y = NULL,
+         title = "Fixed Effect Credible Intervals: Naive vs. Corrected") +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "bottom")
+}
+```
+
+### Computational cost comparison
+
+Selective correction operates on a $|S| \times |S|$ submatrix, where $|S|$
+is the number of flagged parameters. Blanket correction operates on the full
+$d \times d$ matrix.
+
+```{r cost-comparison}
+d <- ncol(draws_corrected)
+n_flagged <- sum(result$classification$flagged)
+
+cat(sprintf("Selective: O(%d^3) = O(%d) operations\n",
+            n_flagged, n_flagged^3))
+cat(sprintf("Blanket:   O(%d^3) = O(%d) operations\n",
+            d, d^3))
+cat(sprintf("Speedup:   %.0fx\n", d^3 / max(n_flagged^3, 1)))
+```
+
+
+## Sensitivity and Robustness
+
+The classification depends on the threshold $\tau$. A robust diagnostic
+should not change its recommendation dramatically when $\tau$ varies over a
+reasonable range.
+
+```{r sensitivity}
+sens <- der_sensitivity(result, tau_range = seq(0.5, 3.0, by = 0.1))
+sens[, c("tau", "n_flagged", "pct_flagged")]
+```
+
+The within-state poverty coefficient is flagged at every threshold from 0.5
+up to approximately its DER value. No other parameter is flagged at any
+threshold above 1.0. This stability confirms a **sharp classification
+boundary**: there is a clean separation between the design-sensitive
+within-cluster covariate and all other parameters.
+
+```{r fig-sensitivity, fig.height = 4, fig.cap = "Sensitivity of the DER classification to the threshold tau. The number of flagged parameters drops from 1 to 0 at the DER value of the poverty coefficient (~2.6). The stable plateau at 1 flagged parameter across a wide range of thresholds indicates a robust classification."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  ggplot(sens, aes(x = tau, y = n_flagged)) +
+    geom_step(colour = pal["tier_ia"], linewidth = 0.9) +
+    geom_point(colour = pal["tier_ia"], size = 2) +
+    geom_vline(xintercept = 1.2, linetype = "dashed",
+               colour = pal["threshold"], linewidth = 0.6) +
+    annotate("text", x = 1.2, y = max(sens$n_flagged) + 0.3,
+             label = expression(tau == 1.2 ~ "(default)"),
+             colour = pal["threshold"], size = 3.5, hjust = -0.05) +
+    scale_y_continuous(breaks = seq(0, max(sens$n_flagged) + 1, by = 1)) +
+    labs(x = expression("Threshold" ~ tau), y = "Number flagged",
+         title = "Sensitivity of Classification to Threshold") +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank())
+}
+```
+
+
+## Cross-Clustering Comparison
+
+The DER depends on the choice of clustering (PSU) definition. The
+`der_compare()` function evaluates how DER changes across different
+clustering schemes. Here we compare state-level clustering (51 clusters)
+with PSU-level clustering (finer partitions within states):
+
+```{r compare}
+comp <- der_compare(
+  nsece_demo$draws,
+  clusters = list(
+    state = nsece_demo$group,
+    psu   = nsece_demo$psu
+  ),
+  y = nsece_demo$y, X = nsece_demo$X,
+  group = nsece_demo$group, weights = nsece_demo$weights,
+  family = "binomial", sigma_theta = nsece_demo$sigma_theta,
+  param_types = nsece_demo$param_types
+)
+```
+
+### Comparing DER across clustering
+
+```{r compare-fe}
+# Fixed effects comparison
+fe_comp <- comp[comp$param %in% paste0("beta[", 1:3, "]"), ]
+fe_wide <- reshape(fe_comp, idvar = "param", timevar = "cluster_name",
+                   direction = "wide")
+fe_wide
+```
+
+```{r fig-compare, fig.height = 4.5, fig.cap = "Cross-clustering comparison of DER values for the three fixed effects. PSU-level clustering (which captures finer-scale design effects) generally yields DER values equal to or higher than state-level clustering. Both clustering schemes flag the same parameter (poverty_cwc)."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  fe_comp$param_label <- c("Intercept", "Poverty (CWC)", "Tiered Reim.")[
+    as.integer(gsub("beta\\[(\\d+)\\]", "\\1", fe_comp$param))
+  ]
+
+  ggplot(fe_comp, aes(x = param_label, y = der, fill = cluster_name)) +
+    geom_col(position = position_dodge(width = 0.6), width = 0.5,
+             colour = "white", linewidth = 0.3) +
+    geom_hline(yintercept = 1.2, linetype = "dashed",
+               colour = pal["threshold"], linewidth = 0.7) +
+    scale_fill_manual(
+      values = c(state = pal["tier_ib"], psu = pal["tier_ia"]),
+      name = "Clustering"
+    ) +
+    labs(x = NULL, y = "Design Effect Ratio",
+         title = "DER by Clustering Definition") +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "bottom")
+}
+```
+
+In general, finer clustering (PSU level) captures more of the design effect
+and may produce higher DER values for within-cluster covariates. The
+practical recommendation is to use the finest available clustering level in
+the DER computation, as this provides the most conservative assessment of
+design sensitivity.
+
+
+## Theorem Verification
+
+The `der_theorem_check()` function compares empirical DER values against the
+closed-form predictions from Theorems 1 and 2.
+
+```{r theorem-check}
+thm <- der_theorem_check(result)
+```
+
+### Fixed effects: Theorem 1
+
+```{r thm-fe}
+fe_thm <- thm[thm$param_type != "re",
+              c("param", "der_empirical", "der_theorem1",
+                "relative_error", "theorem_used")]
+fe_thm
+```
+
+### Random effects: Theorem 2
+
+```{r thm-re}
+re_thm <- thm[thm$param_type == "re",
+              c("param", "der_empirical", "der_theorem2", "relative_error")]
+head(re_thm, 10)
+
+cat(sprintf("\nMean relative error (RE): %.4f\n",
+            mean(re_thm$relative_error, na.rm = TRUE)))
+```
+
+The fixed-effect predictions are typically accurate within a few percent.
+Random-effect predictions may show larger discrepancies in non-conjugate
+models (e.g., logistic) or with substantial imbalance, but the qualitative
+ordering is always preserved.
+
+
+## Reporting DER Results for Publication
+
+### Tidy summary table
+
+The `tidy()` output provides a publication-ready table:
+
+```{r tidy-output}
+td_report <- tidy.svyder(result)
+td_report_fe <- td_report[1:3, c("term", "estimate", "std.error",
+                                  "der", "tier", "action")]
+td_report_fe$estimate  <- round(td_report_fe$estimate, 3)
+td_report_fe$std.error <- round(td_report_fe$std.error, 3)
+td_report_fe$der       <- round(td_report_fe$der, 3)
+td_report_fe
+```
+
+### Key numbers for the methods section
+
+```{r key-numbers}
+gl <- glance.svyder(result)
+
+cat("Key statistics for reporting:\n")
+cat(sprintf("  Mean DEFF:               %.2f\n", gl$mean_deff))
+cat(sprintf("  Mean shrinkage (B):      %.3f\n", gl$mean_B))
+cat(sprintf("  Parameters flagged:      %d / %d (%.1f%%)\n",
+            gl$n_flagged, gl$n_params, gl$pct_flagged))
+cat(sprintf("  Threshold (tau):         %.1f\n", gl$tau))
+cat(sprintf("  DER range:               [%.3f, %.3f]\n",
+            gl$der_min, gl$der_max))
+cat(sprintf("  CI width ratio (beta2):  %.1f%%\n", width_ratio * 100))
+```
+
+### Template paragraph for the methods section
+
+Based on the analysis above, a methods section might include language such
+as:
+
+> We applied the DER diagnostic framework (Lee, 2026) to assess
+> design sensitivity for each model parameter. The mean Kish design effect
+> was DEFF = [value], reflecting substantial variation in survey weights
+> (CV_w = [value]). Of 54 parameters (3 fixed effects + 51 state random
+> effects), only 1 exceeded the classification threshold tau = 1.2: the
+> within-state poverty coefficient (DER = [value]). This parameter's
+> 95% credible interval was widened by [value]% after selective
+> correction. The remaining 53 parameters, including all state random
+> effects (mean DER = [value]) and between-state fixed effects
+> (DER < [value]), were left unchanged. The conservation law was
+> verified with relative error [value].
+
+
+## Full DER Profile
+
+For completeness, the built-in profile plot shows all 54 parameters:
+
+```{r fig-profile-full, fig.height = 5, fig.cap = "Full DER profile across all 54 parameters. Each point is one parameter, colored by tier classification. The dashed purple line marks the threshold tau = 1.2. The single outlier (Tier I-a, red) is the within-state poverty coefficient. All random effects (green, Tier II) and between-state fixed effects (blue, Tier I-b) fall well below the threshold."}
+plot(result, type = "profile")
+```
+
+
+## Summary and Recommendations
+
+This case study demonstrated the full DER diagnostic workflow on a realistic
+survey dataset. The key findings are:
+
+1. **Selective correction is precise.** Only 1 of 54 parameters required
+   correction. Blanket correction would have inappropriately narrowed 53
+   parameters, including all random effects.
+
+2. **The information source determines sensitivity.** The within-cluster
+   poverty covariate inherits the full design effect ($\text{DER} \approx
+   \text{DEFF}$) because the random effects cannot absorb intra-cluster
+   correlation at the individual level. Between-cluster parameters are
+   protected by hierarchical shrinkage.
+
+3. **The conservation law constrains the system.** Protecting the random
+   effects through shrinkage necessarily exposes the grand mean to a larger
+   design effect. The total design sensitivity budget is approximately
+   conserved.
+
+4. **The classification is robust.** The within-state poverty coefficient is
+   flagged at every threshold from 0.5 to its DER value, and no other
+   parameter is flagged at any reasonable threshold.
+
+### General workflow recommendations
+
+| Step | Function | Purpose |
+|:-----|:---------|:--------|
+| 1. Diagnose | `der_diagnose()` | Full pipeline in one call |
+| 2. Inspect | `print()`, `summary()`, `glance()` | Assess overall results |
+| 3. Visualize | `plot(type = "profile")` | Identify flagged parameters |
+| 4. Explain | `der_decompose()` | Understand why each parameter has its DER |
+| 5. Verify | `der_theorem_check()` | Confirm theoretical predictions |
+| 6. Sensitivity | `der_sensitivity()` | Check robustness to threshold |
+| 7. Report | `tidy()`, `as.matrix()` | Publication-ready output |
+
+### When DER matters most
+
+- Large Kish DEFF (> 2), indicating substantial weight variation.
+- Within-cluster covariates in the model (these inherit the full DEFF).
+- Policy analyses where both within-cluster and between-cluster covariates
+  are of substantive interest.
+
+### When DER matters least
+
+- Balanced designs with equal weights (DEFF $\approx$ 1).
+- Models with only between-cluster or random-effect parameters.
+- Exploratory analyses where exact coverage is less critical.
+
+For the mathematical theory underlying this analysis, see
+`vignette("understanding-der", package = "svyder")`.
+For a quick-start guide, see
+`vignette("getting-started", package = "svyder")`.

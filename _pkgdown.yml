@@ -1,0 +1,131 @@
+url: https://joonho112.github.io/svyder/
+
+template:
+  bootstrap: 5
+  bootswatch: cosmo
+  bslib:
+    primary: "#4393C3"
+
+authors:
+  JoonHo Lee:
+    href: https://github.com/joonho112
+
+home:
+  title: "svyder: Design Effect Ratio Diagnostics for Bayesian Survey Models"
+  description: >
+    Computes parameter-level Design Effect Ratios (DER) for Bayesian
+    hierarchical models fitted to complex survey data. Implements the
+    compute-classify-correct diagnostic framework.
+
+navbar:
+  structure:
+    left:  [intro, reference, articles]
+    right: [search, github]
+  components:
+    intro:
+      text: Get Started
+      href: articles/getting-started.html
+    articles:
+      text: Articles
+      menu:
+        - text: "Getting Started"
+        - text: "Getting Started with svyder"
+          href: articles/getting-started.html
+        - text: "Understanding Design Effect Ratios"
+          href: articles/understanding-der.html
+        - text: "---"
+        - text: "Theory"
+        - text: "Decomposition Theorems"
+          href: articles/decomposition-theorems.html
+        - text: "The Compute-Classify-Correct Pipeline"
+          href: articles/pipeline-in-depth.html
+        - text: "---"
+        - text: "Applications"
+        - text: "Case Study: NSECE Survey Data"
+          href: articles/case-study-nsece.html
+
+articles:
+  - title: "Getting Started"
+    navbar: ~
+    contents:
+      - getting-started
+      - understanding-der
+  - title: "Theory"
+    contents:
+      - decomposition-theorems
+      - pipeline-in-depth
+  - title: "Applications"
+    contents:
+      - case-study-nsece
+
+reference:
+  - title: "Core Pipeline"
+    desc: >
+      The compute-classify-correct workflow. Use `der_diagnose()` for an
+      all-in-one call, or invoke the three steps individually for finer
+      control.
+    contents:
+      - der_diagnose
+      - der_compute
+      - der_classify
+      - der_correct
+
+  - title: "Analysis Tools"
+    desc: >
+      Functions for understanding, verifying, and extending DER results.
+    contents:
+      - der_decompose
+      - der_sensitivity
+      - der_theorem_check
+      - der_compare
+
+  - title: "Output Methods"
+    desc: >
+      S3 methods for printing, summarizing, and extracting results in
+      tidy formats compatible with broom conventions.
+    contents:
+      - print.svyder
+      - summary.svyder
+      - tidy.svyder
+      - glance.svyder
+      - as.matrix.svyder
+
+  - title: "Visualization"
+    desc: >
+      Diagnostic plots for DER results. The `plot()` method supports
+      profile, decomposition, and comparison views with automatic
+      ggplot2/base R fallback.
+    contents:
+      - plot.svyder
+      - autoplot.svyder
+
+  - title: "Backend Integration"
+    desc: >
+      Generic extractors for posterior draws and survey design objects.
+      Methods exist for brms, cmdstanr, rstanarm, posterior, and the
+      survey package.
+    contents:
+      - extract_draws
+      - extract_design
+
+  - title: "Classes and Constructors"
+    desc: >
+      Internal constructor and validation functions for the svyder S3
+      class.
+    contents:
+      - new_svyder
+      - validate_svyder
+      - is.svyder
+
+  - title: "Bundled Datasets"
+    desc: >
+      Synthetic datasets for demonstrations and testing. Each dataset
+      ships with pre-computed posterior draws, so no Stan installation
+      is required.
+    contents:
+      - nsece_demo
+      - sim_hlr
+
+  - title: "Package"
+    contents:
+      - svyder-package

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 232" width="200" height="232">
+  <defs>
+    <!-- Background gradient: deep navy -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1B3A4B"/>
+      <stop offset="100%" stop-color="#0D1B2A"/>
+    </linearGradient>
+    <!-- Glow effect for the red dot -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Hex shape: pointy-top, outer border -->
+  <polygon
+    points="100,4 196,60 196,172 100,228 4,172 4,60"
+    fill="url(#bgGrad)"
+    stroke="#4393C3"
+    stroke-width="4"
+    stroke-linejoin="round"
+  />
+
+  <!-- Inner hex highlight (subtle) -->
+  <polygon
+    points="100,10 190,63 190,169 100,222 10,169 10,63"
+    fill="none"
+    stroke="#4393C3"
+    stroke-width="0.5"
+    opacity="0.15"
+  />
+
+  <!-- ============================================================ -->
+  <!-- DER PROFILE MOTIF: Mini dot-and-bar chart                    -->
+  <!-- Shows three parameters at different DER values               -->
+  <!-- Represents the core diagnostic: which parameters are exposed -->
+  <!-- ============================================================ -->
+
+  <!-- Vertical axis line (faint) -->
+  <line x1="52" y1="55" x2="52" y2="118"
+        stroke="#4A6070" stroke-width="1" opacity="0.4"/>
+
+  <!-- Threshold line at tau = 1.2 (vertical dashed, purple) -->
+  <line x1="115" y1="52" x2="115" y2="121"
+        stroke="#762A83" stroke-width="1.5"
+        stroke-dasharray="4,3" opacity="0.45"/>
+
+  <!-- tau label -->
+  <text x="117" y="50" font-family="Helvetica Neue, Arial, sans-serif"
+        font-size="7" fill="#762A83" opacity="0.6" font-style="italic">
+    &#x3C4;
+  </text>
+
+  <!-- Tier I-a: DER ~ 2.64 (long bar, RED - exposed) -->
+  <circle cx="56" cy="68" r="5.5" fill="#D6604D" filter="url(#glow)"/>
+  <line x1="62" y1="68" x2="158" y2="68"
+        stroke="#D6604D" stroke-width="3.5"
+        stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Tier I-b: DER ~ 0.03 (tiny bar, BLUE - shielded) -->
+  <circle cx="56" cy="86" r="5.5" fill="#4393C3"/>
+  <line x1="62" y1="86" x2="70" y2="86"
+        stroke="#4393C3" stroke-width="3.5"
+        stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Tier II: DER ~ 0.04 (tiny bar, GREEN - protected) -->
+  <circle cx="56" cy="104" r="5.5" fill="#1B7837"/>
+  <line x1="62" y1="104" x2="72" y2="104"
+        stroke="#1B7837" stroke-width="3.5"
+        stroke-linecap="round" opacity="0.85"/>
+
+  <!-- ============================================================ -->
+  <!-- PACKAGE NAME                                                 -->
+  <!-- ============================================================ -->
+  <text x="100" y="158"
+        text-anchor="middle"
+        font-family="Helvetica Neue, Arial, sans-serif"
+        font-size="38"
+        font-weight="700"
+        fill="#FFFFFF"
+        letter-spacing="2">
+    svyder
+  </text>
+
+  <!-- ============================================================ -->
+  <!-- SUBTITLE                                                     -->
+  <!-- ============================================================ -->
+  <text x="100" y="182"
+        text-anchor="middle"
+        font-family="Helvetica Neue, Arial, sans-serif"
+        font-size="10.5"
+        fill="#8CA0B3"
+        letter-spacing="2.5"
+        font-weight="300">
+    DER DIAGNOSTICS
+  </text>
+
+  <!-- Decorative line below subtitle -->
+  <line x1="62" y1="190" x2="138" y2="190"
+        stroke="#4393C3" stroke-width="0.7" opacity="0.3"/>
+</svg>

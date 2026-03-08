@@ -1,0 +1,619 @@
+---
+title: "Getting Started with svyder"
+author: "JoonHo Lee"
+date: "`r Sys.Date()`"
+description: >
+  A hands-on introduction to Design Effect Ratio diagnostics with svyder:
+  run the full pipeline in one call, interpret the three-tier classification,
+  visualize DER profiles, extract corrected posterior draws, and build a
+  pipe-friendly workflow --- all using bundled datasets.
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with svyder}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+library(svyder)
+knitr::opts_chunk$set(
+  collapse  = TRUE,
+  comment   = "#>",
+  fig.width  = 7,
+  fig.height = 5,
+  fig.align  = "center",
+  out.width  = "85%"
+)
+set.seed(42)
+
+# Consistent colour palette across all svyder vignettes
+pal <- c(
+  tier_ia    = "#D6604D",
+  tier_ib    = "#4393C3",
+  tier_ii    = "#1B7837",
+  threshold  = "#762A83"
+)
+```
+
+## Overview
+
+Bayesian hierarchical models are the workhorse for analysing grouped survey
+data.  But complex survey designs --- unequal weights, stratification,
+clustering --- create a tension: the model-based posterior can be too narrow
+for some parameters while perfectly calibrated (or even conservative) for
+others.  Existing corrections either ignore the survey design entirely or
+apply a blanket adjustment that destroys the hierarchical structure.
+
+The **svyder** package resolves this tension through the Design Effect Ratio
+(DER), a per-parameter diagnostic that identifies *which* parameters need
+correction and applies the adjustment selectively.
+
+In this vignette you will learn how to:
+
+- **Understand** why Bayesian hierarchical models need parameter-specific
+  design corrections.
+- **Run** a complete DER diagnostic in a single function call.
+- **Interpret** the three-tier classification (Tier I-a, I-b, II).
+- **Visualize** DER results with three built-in plot types.
+- **Extract** corrected posterior draws and tidy summaries.
+- **Build** a pipe-friendly workflow with fine-grained control.
+
+
+## The Problem: Why Do We Need DER?
+
+Consider a hierarchical logistic regression with state-level random effects,
+fitted to data from a complex survey.  The model has three types of parameters:
+
+$$
+y_i \mid \beta, \theta_{j[i]} \sim
+\text{Bernoulli}\bigl(\text{logit}^{-1}(\beta_0 + \beta_1 x_i + \beta_2 z_j
++ \theta_j)\bigr), \quad \theta_j \sim N(0, \sigma_\theta^2),
+$$
+
+where $x_i$ varies *within* clusters (e.g., individual poverty) and $z_j$
+varies only *between* clusters (e.g., state policy).
+
+When the survey design is ignored, the posterior for the within-cluster
+coefficient $\beta_1$ can be substantially too narrow because survey weights
+and clustering inflate variance that the model does not account for.  The
+classical fix --- a sandwich variance estimator --- tells us the "right"
+variance for every parameter simultaneously, and a blanket Cholesky
+correction rescales the entire posterior to match.
+
+The problem with blanket correction is devastating: it treats all 54
+parameters identically.  In a typical NSECE-like model:
+
+- **1 parameter** (the within-state poverty coefficient) genuinely needs
+  correction --- its DER is approximately 2.6.
+- **53 parameters** (2 between-state fixed effects + 51 random effects)
+  have DER well below 1.0 --- their posteriors are already well-calibrated
+  or conservative.
+
+Blanket correction forces the corrected covariance to match the sandwich
+matrix for all parameters.  For random effects, this can shrink credible
+intervals to as little as **4% of their original width**, destroying the
+variance gains from hierarchical shrinkage that motivated the model in the
+first place.
+
+The DER framework provides a third option: **selective correction**.
+Identify the one parameter that needs help, correct it, and leave the
+other 53 untouched.
+
+```{r fig-problem-concept, echo = FALSE, fig.height = 3.5, fig.cap = "The dilemma of blanket correction. In a 54-parameter model, only 1 parameter (1.9%) needs design-based correction. Blanket correction inappropriately modifies the remaining 53 parameters, while selective correction targets only the design-sensitive parameter."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  concept_df <- data.frame(
+    approach = factor(
+      rep(c("Ignore Design", "Blanket Correction", "Selective (svyder)"), each = 2),
+      levels = c("Ignore Design", "Blanket Correction", "Selective (svyder)")
+    ),
+    outcome = rep(c("Correctly handled", "Mishandled"), 3),
+    count = c(53, 1, 1, 53, 54, 0)
+  )
+  concept_df$outcome <- factor(concept_df$outcome,
+                                levels = c("Correctly handled", "Mishandled"))
+
+  ggplot(concept_df, aes(x = approach, y = count, fill = outcome)) +
+    geom_col(position = "stack", width = 0.6, colour = "white",
+             linewidth = 0.4) +
+    geom_text(aes(label = count), position = position_stack(vjust = 0.5),
+              colour = "white", fontface = "bold", size = 4.5) +
+    scale_fill_manual(
+      values = c("Correctly handled" = pal["tier_ii"],
+                 "Mishandled" = pal["tier_ia"]),
+      name = NULL
+    ) +
+    labs(x = NULL, y = "Number of parameters (out of 54)",
+         title = "Why Selective Correction Matters") +
+    theme_minimal(base_size = 12) +
+    theme(legend.position = "bottom",
+          panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_blank())
+}
+```
+
+
+## Installation
+
+```{r install, eval = FALSE}
+# Development version from GitHub
+remotes::install_github("joonho112/svyder")
+```
+
+After installation, load the package:
+
+```{r load}
+library(svyder)
+```
+
+
+## The 5-Minute Demo
+
+The svyder package ships with `nsece_demo`, a synthetic dataset modelled
+after the 2019 National Survey of Early Care and Education (NSECE).  It
+contains all the ingredients needed for a DER analysis --- posterior draws,
+survey weights, and design structure --- so no external model fitting is
+required.
+
+### Data structure
+
+```{r data-load}
+data(nsece_demo)
+```
+
+Let us examine what the dataset contains:
+
+```{r data-structure}
+cat("Components:\n")
+cat(paste(" ", names(nsece_demo), collapse = "\n"), "\n\n")
+
+cat(sprintf("Observations:       N = %d\n", nsece_demo$N))
+cat(sprintf("Groups (states):    J = %d\n", nsece_demo$J))
+cat(sprintf("Fixed effects:      p = %d\n", nsece_demo$p))
+cat(sprintf("Posterior draws:    S = %d\n", nrow(nsece_demo$draws)))
+cat(sprintf("Total parameters:   d = %d (p + J)\n",
+            ncol(nsece_demo$draws)))
+cat(sprintf("Family:             %s\n", nsece_demo$family))
+cat(sprintf("Random effect SD:   sigma_theta = %.2f\n",
+            nsece_demo$sigma_theta))
+```
+
+The `param_types` vector tells svyder how each fixed effect draws its
+identifying information:
+
+```{r param-types}
+data.frame(
+  covariate  = c("Intercept", "Poverty (CWC)", "Tiered Reim."),
+  param_type = nsece_demo$param_types,
+  description = c(
+    "Identified from between-state comparisons",
+    "Identified from within-state variation",
+    "Identified from between-state comparisons"
+  )
+)
+```
+
+### Running the diagnostic
+
+The full DER pipeline --- compute, classify, correct --- runs in a single
+call to `der_diagnose()`:
+
+```{r diagnose}
+result <- der_diagnose(
+  x           = nsece_demo$draws,
+  y           = nsece_demo$y,
+  X           = nsece_demo$X,
+  group       = nsece_demo$group,
+  weights     = nsece_demo$weights,
+  psu         = nsece_demo$psu,
+  family      = nsece_demo$family,
+  sigma_theta = nsece_demo$sigma_theta,
+  param_types = nsece_demo$param_types,
+  tau         = 1.2
+)
+```
+
+### Reading the print output
+
+```{r print-result}
+result
+```
+
+The `print` method gives a concise diagnostic summary:
+
+- **DER range**: the minimum and maximum DER across all parameters.
+- **Threshold (tau)**: the classification cutoff (default 1.2).
+- **Flagged**: how many parameters exceed the threshold.
+- **Flagged parameters**: the parameter name, DER value, tier, and action.
+
+In this example, exactly 1 of 54 parameters is flagged: `beta[2]` (the
+within-state poverty coefficient) with DER $\approx$ 2.6.  This means its
+model-based posterior variance is only about 38% of what the sandwich
+variance indicates it should be.  The correction will widen its credible
+interval by a factor of $\sqrt{2.6} \approx 1.6$.
+
+### The summary view
+
+```{r summary-result}
+summary(result)
+```
+
+The `summary()` method displays the full classification table for all
+parameters, including tier assignment, DER value, and whether each
+parameter is flagged.
+
+
+## Understanding the Output
+
+The `der_diagnose()` result is an S3 object of class `svyder`.  Its main
+components are:
+
+| Component | Description |
+|:----------|:------------|
+| `der` | Named numeric vector of DER values (length $d = p + J$) |
+| `classification` | Data frame with tier, flag status, and action for each parameter |
+| `V_sand` | Sandwich variance matrix ($d \times d$) |
+| `sigma_mcmc` | Posterior covariance from MCMC ($d \times d$) |
+| `deff_j` | Per-group design effects (length $J$) |
+| `B_j` | Per-group shrinkage factors (length $J$) |
+| `corrected_draws` | Corrected posterior draws matrix ($S \times d$) |
+| `scale_factors` | Correction scale factors (length $d$; 1.0 for unflagged) |
+| `original_draws` | Original (uncorrected) posterior draws |
+
+### DER values
+
+The DER vector contains one value per parameter:
+
+```{r der-values}
+# Fixed-effect DER values
+cat("Fixed effects:\n")
+round(result$der[1:3], 4)
+
+cat("\nRandom effects (first 10):\n")
+round(result$der[4:13], 4)
+```
+
+Notice the striking contrast: `beta[2]` (within-state poverty) has DER
+$\approx$ 2.6, while all other parameters have DER well below 1.0.  This
+100-fold difference in design sensitivity across parameters in the *same
+model* is exactly what motivates selective correction.
+
+### Per-group diagnostics
+
+The per-group design effects and shrinkage factors reveal the survey
+structure:
+
+```{r group-diagnostics}
+cat("Design effects (DEFF) by state --- first 10:\n")
+round(result$deff_j[1:10], 3)
+
+cat(sprintf("\nMean DEFF across states: %.3f\n", mean(result$deff_j)))
+
+cat("\nShrinkage factors (B) by state --- first 10:\n")
+round(result$B_j[1:10], 3)
+
+cat(sprintf("\nMean B across states: %.3f\n", mean(result$B_j)))
+```
+
+A mean DEFF of approximately 3.5 means the survey carries only about 29% of
+the information that an equally sized simple random sample would provide.
+A mean shrinkage factor $B$ near 0.96 indicates that most states have enough
+data that their random effects rely primarily on their own observations rather
+than borrowing from the grand mean.
+
+### The glance summary
+
+The `glance.svyder()` method provides a one-row overview of the diagnostic:
+
+```{r glance}
+glance.svyder(result)
+```
+
+
+## Visualizing Results
+
+The `plot()` method provides three complementary diagnostic visualizations.
+When ggplot2 is installed, all plots are returned as `ggplot` objects that
+can be further customised.
+
+### Profile plot
+
+The default profile plot shows DER values for each parameter, coloured by
+tier, with the threshold $\tau$ as a dashed line:
+
+```{r fig-profile, fig.height = 5, fig.cap = "DER profile plot. Each dot represents one parameter, coloured by its tier classification. The dashed purple line marks the threshold tau = 1.2. Only beta[2] (the within-state poverty coefficient) exceeds the threshold, confirming that it is the sole parameter requiring design-based correction."}
+plot(result, type = "profile")
+```
+
+The profile plot is the single most informative DER visualization.  At a
+glance, you can see:
+
+- **Which parameters are flagged** (above the dashed line).
+- **The magnitude of design sensitivity** (distance from 1.0).
+- **The tier structure** (colour coding distinguishes within-cluster FE,
+  between-cluster FE, and random effects).
+
+### Decomposition plot
+
+The decomposition plot compares observed DER values against their
+theoretical predictions from the decomposition formulas:
+
+```{r fig-decomposition, fig.height = 5, fig.cap = "DER decomposition: observed versus predicted values. Points near the 1:1 line indicate good agreement between the closed-form decomposition and the full sandwich computation. Fixed effects (orange/blue) and random effects (green) cluster in distinct regions, reflecting their different design sensitivity."}
+plot(result, type = "decomposition")
+```
+
+This plot verifies that the theoretical framework correctly predicts the
+empirical DER values.  When points lie close to the 1:1 line, the
+simplified decomposition formulas (Theorems 1 and 2) accurately capture
+the survey design's effect on each parameter.
+
+### Comparison plot
+
+The comparison plot shows naive versus corrected credible intervals for
+flagged parameters:
+
+```{r fig-comparison, fig.height = 3.5, fig.cap = "Credible interval comparison for the flagged parameter beta[2]. Grey shows the naive model-based interval; the coloured interval shows the DER-corrected result. The correction widens the interval to properly account for the survey design, ensuring valid frequentist coverage."}
+plot(result, type = "comparison")
+```
+
+For unflagged parameters the intervals are identical (scale factor = 1.0),
+so the plot displays only flagged parameters by default.
+
+### Customising with autoplot
+
+For full ggplot2 control, use `autoplot()`:
+
+```{r fig-autoplot, fig.height = 5, fig.cap = "Customised DER profile using autoplot(). The ggplot2 object can be modified with standard ggplot2 functions, here adding a custom title and theme adjustments."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  p <- autoplot(result, type = "profile") +
+    labs(title = "DER Diagnostic Profile --- NSECE Demo",
+         subtitle = "Selective correction targets only design-sensitive parameters") +
+    theme(plot.title = element_text(face = "bold"))
+  print(p)
+}
+```
+
+
+## Extracting Results
+
+### Tidy parameter table
+
+The `tidy.svyder()` method returns a one-row-per-parameter data frame
+following broom conventions:
+
+```{r tidy}
+td <- tidy.svyder(result)
+head(td, 10)
+```
+
+The data frame includes:
+
+| Column | Description |
+|:-------|:------------|
+| `term` | Parameter name |
+| `estimate` | Posterior mean |
+| `std.error` | Posterior standard deviation |
+| `der` | Design Effect Ratio |
+| `tier` | Three-tier classification |
+| `action` | `"CORRECT"` or `"retain"` |
+| `flagged` | Whether the parameter exceeds the threshold |
+| `scale_factor` | Cholesky scale factor applied |
+
+### Model-level summary
+
+The `glance.svyder()` method returns a one-row data frame with aggregate
+diagnostics:
+
+```{r glance-table}
+gl <- glance.svyder(result)
+t(gl)
+```
+
+### Corrected posterior draws
+
+The `as.matrix()` method extracts the posterior draws.  If correction has
+been applied, corrected draws are returned; otherwise the originals:
+
+```{r draws}
+draws_corrected <- as.matrix(result)
+cat(sprintf("Draws matrix: %d samples x %d parameters\n",
+            nrow(draws_corrected), ncol(draws_corrected)))
+```
+
+These corrected draws are suitable for any downstream analysis ---
+posterior summaries, credible intervals, posterior predictive checks, or
+derived quantities.
+
+### Comparing original vs corrected intervals
+
+A practical check: compute 90% credible intervals from both the original
+and corrected draws for the fixed effects.
+
+```{r ci-comparison}
+# Fixed effects are in columns 1:3
+fe_original  <- result$original_draws[, 1:3]
+fe_corrected <- draws_corrected[, 1:3]
+
+ci_orig <- apply(fe_original, 2, quantile, probs = c(0.05, 0.50, 0.95))
+ci_corr <- apply(fe_corrected, 2, quantile, probs = c(0.05, 0.50, 0.95))
+
+colnames(ci_orig) <- colnames(ci_corr) <-
+  c("Intercept", "Poverty (CWC)", "Tiered Reim.")
+
+cat("Original 90% credible intervals:\n")
+round(ci_orig, 3)
+
+cat("\nCorrected 90% credible intervals:\n")
+round(ci_corr, 3)
+```
+
+Observe that only the poverty coefficient interval widens (reflecting the
+DER correction with scale factor $\sqrt{2.6} \approx 1.6$), while the
+intercept and tiered reimbursement intervals remain unchanged.
+
+### Visualising the CI comparison
+
+```{r fig-ci-manual, fig.height = 4, fig.cap = "Manual credible interval comparison for the three fixed effects. The poverty coefficient (beta[2]) is the only parameter whose interval widens after correction. The intercept and tiered reimbursement coefficient are identical before and after correction because their DER values are below the threshold."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  fe_names <- c("Intercept", "Poverty (CWC)", "Tiered Reim.")
+  ci_df <- data.frame(
+    param   = rep(fe_names, 2),
+    type    = rep(c("Original", "Corrected"), each = 3),
+    lower   = c(ci_orig[1, ], ci_corr[1, ]),
+    median  = c(ci_orig[2, ], ci_corr[2, ]),
+    upper   = c(ci_orig[3, ], ci_corr[3, ])
+  )
+  ci_df$param <- factor(ci_df$param, levels = rev(fe_names))
+  ci_df$type  <- factor(ci_df$type, levels = c("Original", "Corrected"))
+
+  ggplot(ci_df, aes(x = median, y = param, colour = type)) +
+    geom_pointrange(aes(xmin = lower, xmax = upper),
+                    position = position_dodge(width = 0.4),
+                    size = 0.5, linewidth = 0.7) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
+    scale_colour_manual(
+      values = c(Original = "grey50", Corrected = pal["tier_ia"]),
+      name = NULL
+    ) +
+    labs(x = "Coefficient estimate (90% CI)", y = NULL,
+         title = "Fixed-Effect Credible Intervals: Original vs Corrected") +
+    theme_minimal(base_size = 12) +
+    theme(legend.position = "bottom",
+          panel.grid.minor = element_blank())
+}
+```
+
+
+## The Pipe-Friendly Pipeline
+
+The `der_diagnose()` function is a convenience wrapper.  For more control,
+you can call each step individually using the pipe operator:
+
+```{r pipeline}
+# Step-by-step pipeline
+obj <- der_compute(
+  nsece_demo$draws,
+  y           = nsece_demo$y,
+  X           = nsece_demo$X,
+  group       = nsece_demo$group,
+  weights     = nsece_demo$weights,
+  psu         = nsece_demo$psu,
+  family      = nsece_demo$family,
+  sigma_theta = nsece_demo$sigma_theta,
+  param_types = nsece_demo$param_types
+)
+```
+
+At this point the DER values have been computed but no classification or
+correction has been applied:
+
+```{r pipeline-inspect}
+obj
+```
+
+Now classify with a threshold.  You can try different values without
+recomputing the expensive sandwich matrices:
+
+```{r pipeline-classify}
+obj <- der_classify(obj, tau = 1.2)
+```
+
+Finally, apply selective correction to flagged parameters:
+
+```{r pipeline-correct}
+obj <- der_correct(obj)
+obj
+```
+
+The step-by-step approach is useful when you want to:
+
+- **Inspect intermediate results** (e.g., check the sandwich matrix
+  before classification).
+- **Try different thresholds** without recomputing the DER values.
+- **Skip correction** if you only need the diagnostic.
+
+### Exploring alternative thresholds
+
+```{r alt-threshold}
+# What if we use a stricter threshold?
+obj_strict <- der_classify(obj, tau = 2.0)
+
+# What about a looser one?
+obj_loose <- der_classify(obj, tau = 1.0)
+```
+
+The classification output immediately tells you how many parameters would
+be flagged under each threshold.  With this NSECE-like data, the result is
+remarkably stable: the same parameter (`beta[2]`) is the only one flagged
+across a wide range of thresholds, because its DER of 2.6 stands well above
+all other parameters.
+
+
+## DER with Equal Weights: A Sanity Check
+
+To verify that svyder behaves correctly when there are no design effects,
+we can run the diagnostic on `sim_hlr`, a balanced Gaussian dataset with
+equal weights (DEFF = 1):
+
+```{r sim-hlr}
+data(sim_hlr)
+
+result_hlr <- der_diagnose(
+  x           = sim_hlr$draws,
+  y           = sim_hlr$y,
+  X           = sim_hlr$X,
+  group       = sim_hlr$group,
+  weights     = sim_hlr$weights,
+  psu         = sim_hlr$psu,
+  family      = sim_hlr$family,
+  sigma_theta = sim_hlr$sigma_theta,
+  sigma_e     = sim_hlr$sigma_e,
+  param_types = sim_hlr$param_types,
+  tau         = 1.2
+)
+
+result_hlr
+```
+
+With equal weights, no parameters are flagged.  All DER values are near 1.0
+or below, confirming that the hierarchical model is already well-calibrated
+when there is no survey design effect.  This is the expected behaviour:
+svyder is conservative and only flags parameters when the design genuinely
+distorts the posterior.
+
+```{r fig-hlr-profile, fig.height = 4, fig.cap = "DER profile for the equal-weight sim_hlr dataset. All parameters are near or below the threshold, confirming the absence of design effects. The hierarchical model is well-calibrated without any correction."}
+plot(result_hlr, type = "profile")
+```
+
+
+## Key Takeaway
+
+Selective correction is always preferable to blanket correction when the
+goal is valid marginal coverage for each parameter.  In this NSECE-like
+example:
+
+- Only **1 of 54 parameters** (1.9%) needs correction.
+- Blanket correction would inappropriately modify 53 parameters.
+- For random effects, blanket correction can shrink credible intervals
+  to as little as **4% of their original width**.
+
+The svyder package makes selectivity practical: one function call identifies
+the design-sensitive parameters and corrects only those, leaving the
+well-calibrated hierarchical structure undisturbed.
+
+
+## What's Next?
+
+| Vignette | What you will learn |
+|:---------|:--------------------|
+| *Understanding Design Effect Ratios* | DER definition, the three regimes, decomposition theorems, conservation law, and sensitivity analysis |
+| *Advanced Workflows* | Custom sandwich matrices, brms/rstanarm integration, multi-level clustering comparisons |
+| *Simulation Studies* | Verifying DER coverage properties through Monte Carlo simulation |
+
+For the mathematical details behind the DER framework, continue to
+`vignette("understanding-der", package = "svyder")`.

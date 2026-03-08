@@ -1,0 +1,16 @@
+bibentry(
+  bibtype = "Article",
+  title = "Design Effect Ratios for Bayesian Survey Models: A Diagnostic Framework for Identifying Survey-Sensitive Parameters",
+  author = person("JoonHo", "Lee"),
+  journal = "arXiv preprint",
+  year = "2026"
+)
+
+bibentry(
+  bibtype = "Manual",
+  title = "svyder: Design Effect Ratio Diagnostics for Bayesian Survey Models",
+  author = person("JoonHo", "Lee"),
+  year = "2026",
+  note = paste("R package version", meta$Version),
+  url = "https://github.com/joonho112/svyder"
+)
