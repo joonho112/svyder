@@ -2,12 +2,16 @@
 <url><loc>https://joonho112.github.io/svyder/404.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/LICENSE-text.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/LICENSE.html</loc></url>
+<url><loc>https://joonho112.github.io/svyder/articles/backends.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/articles/case-study-nsece.html</loc></url>
-<url><loc>https://joonho112.github.io/svyder/articles/decomposition-theorems.html</loc></url>
+<url><loc>https://joonho112.github.io/svyder/articles/choosing-the-target.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/articles/getting-started.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/articles/index.html</loc></url>
-<url><loc>https://joonho112.github.io/svyder/articles/pipeline-in-depth.html</loc></url>
-<url><loc>https://joonho112.github.io/svyder/articles/understanding-der.html</loc></url>
+<url><loc>https://joonho112.github.io/svyder/articles/pipeline.html</loc></url>
+<url><loc>https://joonho112.github.io/svyder/articles/theory-classification-correction.html</loc></url>
+<url><loc>https://joonho112.github.io/svyder/articles/theory-decomposition.html</loc></url>
+<url><loc>https://joonho112.github.io/svyder/articles/theory-der.html</loc></url>
+<url><loc>https://joonho112.github.io/svyder/articles/theory-sandwich.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/authors.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/index.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/news/index.html</loc></url>
@@ -37,6 +41,7 @@
 <url><loc>https://joonho112.github.io/svyder/reference/nsece_demo.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/reference/plot.svyder.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/reference/print.svyder.html</loc></url>
+<url><loc>https://joonho112.github.io/svyder/reference/reexports.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/reference/sim_hlr.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/reference/summary.svyder.html</loc></url>
 <url><loc>https://joonho112.github.io/svyder/reference/svyder-package.html</loc></url>

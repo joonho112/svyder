@@ -28,7 +28,10 @@ new_svyder(
   family,
   n_obs,
   n_groups,
-  compute_time
+  compute_time,
+  target = NULL,
+  excluded = NULL,
+  data = NULL
 )
 ```
 
@@ -80,7 +83,8 @@ new_svyder(
 
 - scale_factors:
 
-  Numeric vector of Cholesky scale factors (length d).
+  Numeric vector of marginal SD ratios recorded for correction reporting
+  (length d).
 
 - original_draws:
 
@@ -105,6 +109,21 @@ new_svyder(
 - compute_time:
 
   Numeric scalar, computation time in seconds.
+
+- target:
+
+  List describing the declared variance target (aggregation unit,
+  strata, meat options, weight convention, bread convention).
+
+- excluded:
+
+  Data frame of Tier III parameters excluded from the DER diagnostic
+  (hyperparameters), with reasons.
+
+- data:
+
+  List of data slots retained for re-targeting and structural
+  decomposition (X, group, weights, cluster, strata, v, r).
 
 ## Value
 

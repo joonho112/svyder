@@ -1,10 +1,15 @@
 # Synthetic NSECE-Like Survey Data
 
-A synthetic dataset mimicking the NSECE 2019 survey structure for
-demonstration of the DER diagnostic pipeline. Contains N = 6785
-observations across J = 51 states with unequal survey weights, clustered
-PSU structure, and three fixed-effect covariates (intercept,
-within-cluster poverty, between-cluster tiered reimbursement policy).
+A **synthetic** dataset mimicking the structure of the 2019 National
+Survey of Early Care and Education (NSECE) for demonstration of the DER
+diagnostic pipeline. It is *NSECE-like*, not the real NSECE data: the
+observations, weights, and precomputed posterior draws are simulated to
+reproduce the design features (clustering, unequal weighting, a binomial
+outcome), so all examples run with no Stan installation and no
+restricted data access. Contains N = 6785 observations across J = 51
+states with unequal survey weights, clustered PSU structure, and three
+fixed-effect covariates (intercept, within-cluster poverty,
+between-cluster tiered reimbursement policy).
 
 ## Usage
 
@@ -70,8 +75,20 @@ A list with components:
 
 ## Source
 
-Synthetic data generated to mimic NSECE 2019 structure. See
-`data-raw/generate_nsece_demo.R`.
+Synthetic data generated to mimic the 2019 NSECE structure; not the real
+NSECE survey. See `data-raw/generate_nsece_demo.R`.
+
+## References
+
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. *Journal of Survey Statistics and
+Methodology*. Submitted.
+
+## See also
+
+Other datasets:
+[`sim_hlr`](https://joonho112.github.io/svyder/reference/sim_hlr.md)
 
 ## Examples
 

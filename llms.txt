@@ -1,143 +1,240 @@
 # svyder
 
-**Design Effect Ratio Diagnostics for Bayesian Survey Models** – *Which
-parameters need survey correction?*
+**Design Effect Ratio diagnostics for Bayesian survey models** — *which
+parameters actually need a survey-design correction, and which are
+better left alone?*
 
-## Overview
+## The problem
 
-When Bayesian hierarchical models are fitted to complex survey data, not
-all parameters are equally affected by the survey design. Some
-parameters (e.g., within-cluster covariates) are highly sensitive to
-unequal weighting and clustering, while others (e.g., random effects)
-are naturally protected by hierarchical shrinkage.
+When you fit a Bayesian hierarchical model to complex survey data — a
+weighted pseudo-posterior — the posterior does not automatically reflect
+the sampling design. The usual repair is to rescale the whole posterior
+toward a design-based **sandwich** variance. Applied to *every*
+parameter that is a mistake: a within-group covariate genuinely needs
+its interval widened, but a shrinkage-protected random effect or a
+between-group coefficient gets its already-narrow interval crushed.
 
-**svyder** computes parameter-level Design Effect Ratios (DER) that
-quantify how much each parameter’s posterior variance should change when
-the survey design is properly accounted for. It implements a three-step
-compute-classify-correct pipeline: DER values near 1 indicate
-well-calibrated posteriors; values substantially above 1 indicate
-underestimation of uncertainty.
+**svyder** computes a per-parameter **Design Effect Ratio (DER)** — the
+ratio of a parameter’s design-based sandwich variance to its model
+posterior variance — and uses it to correct only the parameters that
+need it.
+
+- **DER \> 1** — the posterior understates design uncertainty → widen
+  it.
+- **DER ≈ 1** — already calibrated → leave it alone.
+- **DER \< 1** — the posterior is already wider than the target →
+  correcting would wrongly *narrow* it and destroy the shrinkage
+  protection.
+
+## When should I use svyder?
+
+- You fit a Bayesian hierarchical / multilevel model to data from a
+  complex survey (unequal weights, clustering, stratification).
+- You want to know **which** coefficients and random effects are
+  sensitive to the design — not just a single global design effect.
+- You want a defensible, **selective** correction rather than a blanket
+  rescaling of the whole posterior.
 
 ## Installation
 
-You can install the development version of svyder from
-[GitHub](https://github.com/joonho112/svyder):
-
 ``` r
+
 # install.packages("pak")
 pak::pak("joonho112/svyder")
 ```
 
-## Quick Demo (5 minutes)
+## Quick start (5 minutes, no Stan required)
+
+svyder ships two datasets with **pre-computed posterior draws**, so you
+can run the whole pipeline immediately.
 
 ``` r
+
 library(svyder)
+data(nsece_demo)   # synthetic, NSECE-like survey data: 6,785 units, 51 states, 644 PSUs
 
-# Load bundled NSECE-like survey data
-data(nsece_demo)
-
-# Run the full DER diagnostic pipeline
 result <- der_diagnose(
   nsece_demo$draws,
-  y = nsece_demo$y,
-  X = nsece_demo$X,
-  group = nsece_demo$group,
+  y = nsece_demo$y, X = nsece_demo$X,
+  group   = nsece_demo$group,
   weights = nsece_demo$weights,
-  psu = nsece_demo$psu,
-  family = "binomial",
+  cluster = nsece_demo$psu,          # the design PSU  ->  a *design-based* target
+  family  = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
-  param_types = nsece_demo$param_types
+  param_types = nsece_demo$param_types,
+  verbose = FALSE
 )
-
-# Print summary
-print(result)
+result
+#> svyder diagnostic (54 parameters)
+#>   Family: binomial | N = 6785 | J = 51
+#>   Target: 644 cluster(s) | meat: centered, DF-corrected | weights: unit_mean
+#>   DER range: [0.235, 5.308]
+#>   Tier III (DER undefined): sigma_theta
+#>   Threshold (tau): 1.20
+#>   Flagged: 30 / 54 (55.6%)
+#> 
+#>   Flagged parameters:
+#>     beta[2]              DER = 2.689  [I-a] -> CORRECT
+#>     theta[1]             DER = 3.386  [II] -> CORRECT
+#>     theta[4]             DER = 2.210  [II] -> CORRECT
+#>     theta[5]             DER = 1.568  [II] -> CORRECT
+#>     theta[6]             DER = 2.104  [II] -> CORRECT
+#>     theta[7]             DER = 2.232  [II] -> CORRECT
+#>     theta[9]             DER = 5.308  [II] -> CORRECT
+#>     theta[11]            DER = 2.655  [II] -> CORRECT
+#>     theta[15]            DER = 1.576  [II] -> CORRECT
+#>     theta[18]            DER = 4.025  [II] -> CORRECT
+#>     ... and 20 more
+#> 
+#>   Correction applied: 30 parameter(s) rescaled
+#>   Compute time: 0.023 sec
 ```
 
-The output shows which parameters are flagged for correction:
+[`der_diagnose()`](https://joonho112.github.io/svyder/reference/der_diagnose.md)
+runs the three-step **compute → classify → correct** pipeline in one
+call.
 
-``` R
-svyder diagnostic (54 parameters)
-  Family: binomial | N = 6785 | J = 51
-  DER range: [0.026, 3.891]
-  Threshold (tau): 1.20
-  Flagged: 2 / 54 (3.7%)
-
-  Flagged parameters:
-    beta[1]              DER = 1.465  [I-b] -> CORRECT
-    beta[2]              DER = 3.891  [I-a] -> CORRECT
-
-  Correction applied: 2 parameter(s) rescaled
-```
-
-## DER Profile Plot
-
-Visualize the DER values across all parameters with tier-based coloring:
+### Which parameters were flagged?
 
 ``` r
+
+head(tidy(result), 3)   # the three fixed effects
+#>            term   estimate  std.error       der tier  action flagged
+#> beta[1] beta[1]  0.2498445 0.14735061 0.2626885  I-b  retain   FALSE
+#> beta[2] beta[2] -0.1494408 0.02604573 2.6894416  I-a CORRECT    TRUE
+#> beta[3] beta[3]  0.1610078 0.20239837 0.3430527  I-b  retain   FALSE
+#>         scale_factor
+#> beta[1]     1.000000
+#> beta[2]     1.639952
+#> beta[3]     1.000000
+```
+
+The within-state poverty coefficient (`beta[2]`) is flagged — Tier I-a,
+DER ≈ 2.7 — and its posterior is widened. The two between-state
+coefficients sit well below the threshold and are left untouched (Tier
+I-b).
+
+### The DER profile
+
+``` r
+
 plot(result, type = "profile")
 ```
 
-## Decomposition
+![](reference/figures/README-profile-1.png)
 
-Understand *why* each parameter has its observed DER:
+## How to read the output
+
+- **DER** — design-based variance ÷ posterior variance, for each
+  parameter.
+- **Tier** — **I-a** within-group fixed effects (most exposed), **I-b**
+  between-group fixed effects (shielded by shrinkage), **II** random
+  effects (shrinkage-protected), **III** hyperparameters (excluded by
+  construction).
+- **flagged / action** — DER above the threshold (default `tau = 1.2`) →
+  the parameter is corrected; otherwise it is retained unchanged.
+
+## The one decision you must make: the variance target
+
+`cluster` is **required** and has no default, because the sandwich
+aggregation unit is part of the estimand — the answer can change
+materially between a **design-PSU** target and a **model-group** target.
+Report both with
+[`der_compare()`](https://joonho112.github.io/svyder/reference/der_compare.md):
 
 ``` r
-decomp <- der_decompose(result)
-head(decomp[, c("param", "param_type", "der", "der_predicted")])
+
+comp <- der_compare(result, clusters = list(
+  design_psu  = nsece_demo$psu,
+  model_group = nsece_demo$group
+))
+subset(comp, param == "beta[2]")   # poverty coefficient under both targets
+#>      param cluster_name      der
+#> 2  beta[2]   design_psu 2.689442
+#> 56 beta[2]  model_group 1.892591
 ```
 
-## Tidy Output
+## Key features
 
-svyder integrates with the tidyverse via broom-style methods:
+- Per-parameter DER with a four-tier classification and **selective
+  block-Cholesky** correction — unflagged parameters are left bitwise
+  unchanged.
+- The **declared variance target** is explicit and recorded in the
+  result: aggregation unit, strata, weight convention, and bread
+  convention.
+- Closed-form **decomposition**
+  ([`der_decompose()`](https://joonho112.github.io/svyder/reference/der_decompose.md))
+  and theorem checks
+  ([`der_theorem_check()`](https://joonho112.github.io/svyder/reference/der_theorem_check.md))
+  linking DER to the Kish design effect and hierarchical shrinkage.
+- Works from a plain draws matrix or directly from **brms**,
+  **cmdstanr**, **rstanarm**, and the **survey** package.
+- broom-style [`tidy()`](https://generics.r-lib.org/reference/tidy.html)
+  / [`glance()`](https://generics.r-lib.org/reference/glance.html) and
+  profile / decomposition / comparison plots.
 
-``` r
-# Per-parameter summary
-tidy_df <- tidy(result)
-head(tidy_df)
+## Documentation
 
-# Model-level summary
-glance(result)
-```
+Two tracks of vignettes — hands-on workflows and the mathematical
+foundations (<https://joonho112.github.io/svyder/>).
 
-## Backend Support
+**Applied track**
 
-svyder works with multiple Bayesian modeling backends:
+| Article | What it covers |
+|----|----|
+| [Getting Started](https://joonho112.github.io/svyder/articles/getting-started.html) | the whole pipeline in five minutes |
+| [Choosing the Variance Target](https://joonho112.github.io/svyder/articles/choosing-the-target.html) | design-PSU vs model-group, weights, strata |
+| [The Compute–Classify–Correct Pipeline](https://joonho112.github.io/svyder/articles/pipeline.html) | the three steps in depth |
+| [Case Study: NSECE-Style Survey Data](https://joonho112.github.io/svyder/articles/case-study-nsece.html) | a full worked analysis |
+| [Backends](https://joonho112.github.io/svyder/articles/backends.html) | brms, cmdstanr, rstanarm, survey |
 
-| Backend  | [`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md) method      | Auto-detection                   |
-|----------|--------------------------------------------------------------------------------------------|----------------------------------|
-| Matrix   | [`der_compute.matrix()`](https://joonho112.github.io/svyder/reference/der_compute.md)      | –                                |
-| brms     | [`der_compute.brmsfit()`](https://joonho112.github.io/svyder/reference/der_compute.md)     | y, X, group, family, sigma_theta |
-| cmdstanr | [`der_compute.CmdStanMCMC()`](https://joonho112.github.io/svyder/reference/der_compute.md) | –                                |
-| rstanarm | [`der_compute.stanreg()`](https://joonho112.github.io/svyder/reference/der_compute.md)     | y, X, group, family, sigma_theta |
+**Method track**
 
-## Key Functions
+| Article | What it covers |
+|----|----|
+| [The Design Effect Ratio](https://joonho112.github.io/svyder/articles/theory-der.html) | definition and the three regimes |
+| [The Declared Variance Target](https://joonho112.github.io/svyder/articles/theory-sandwich.html) | the bread and meat of the sandwich |
+| [Decomposition Theorems](https://joonho112.github.io/svyder/articles/theory-decomposition.html) | Theorems 1–2 and the conservation law |
+| [Classification and Selective Correction](https://joonho112.github.io/svyder/articles/theory-classification-correction.html) | tiers and block-Cholesky correction |
 
-| Function                                                                                   | Purpose                                            |
-|--------------------------------------------------------------------------------------------|----------------------------------------------------|
-| [`der_diagnose()`](https://joonho112.github.io/svyder/reference/der_diagnose.md)           | All-in-one pipeline (compute + classify + correct) |
-| [`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md)             | Compute DER values                                 |
-| [`der_classify()`](https://joonho112.github.io/svyder/reference/der_classify.md)           | Three-tier classification                          |
-| [`der_correct()`](https://joonho112.github.io/svyder/reference/der_correct.md)             | Selective Cholesky correction                      |
-| [`der_decompose()`](https://joonho112.github.io/svyder/reference/der_decompose.md)         | Decompose DER into DEFF, B, R_k, kappa             |
-| [`der_sensitivity()`](https://joonho112.github.io/svyder/reference/der_sensitivity.md)     | Threshold sensitivity analysis                     |
-| [`der_theorem_check()`](https://joonho112.github.io/svyder/reference/der_theorem_check.md) | Verify theoretical predictions                     |
-| [`der_compare()`](https://joonho112.github.io/svyder/reference/der_compare.md)             | Compare across clustering definitions              |
+## Backend support
+
+| Backend | [`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md) method | Auto-extracts |
+|----|----|----|
+| draws matrix | [`der_compute.matrix()`](https://joonho112.github.io/svyder/reference/der_compute.md) | — (you supply everything) |
+| brms | [`der_compute.brmsfit()`](https://joonho112.github.io/svyder/reference/der_compute.md) | `y`, `X`, `group`, `family`, `sigma_theta` |
+| cmdstanr | [`der_compute.CmdStanMCMC()`](https://joonho112.github.io/svyder/reference/der_compute.md) | draws only (you supply the data) |
+| rstanarm | [`der_compute.stanreg()`](https://joonho112.github.io/svyder/reference/der_compute.md) | `y`, `X`, `group`, `family`, `sigma_theta` |
+| survey | [`extract_design()`](https://joonho112.github.io/svyder/reference/extract_design.md) | `weights`, `cluster`, `strata` |
+
+You always supply the variance target (`cluster`, and `strata` if
+applicable).
 
 ## Citation
 
-If you use svyder in your research, please cite:
+``` r
 
-> Lee, J. (2026). Design Effect Ratios for Bayesian Survey Models: A
-> Diagnostic Framework for Identifying Survey-Sensitive Parameters.
-> *arXiv preprint*.
+citation("svyder")
+```
+
+> Lee, J., Williams, M. R., & Savitsky, T. D. (2026). *Design Effect
+> Ratios for Bayesian Survey Models: A Diagnostic Framework for
+> Identifying Survey-Sensitive Parameters.* Journal of Survey Statistics
+> and Methodology. Submitted.
 
 ## License
 
-MIT
+MIT © JoonHo Lee — Assistant Professor, The University of Alabama
+([ORCID 0009-0006-4019-8703](https://orcid.org/0009-0006-4019-8703)).
 
 # Package index
 
-## Core Pipeline
+## Core pipeline
+
+The compute-classify-correct workflow. Use
+[`der_diagnose()`](https://joonho112.github.io/svyder/reference/der_diagnose.md)
+for the all-in-one call, or invoke the three steps individually for
+finer control.
 
 - [`der_diagnose()`](https://joonho112.github.io/svyder/reference/der_diagnose.md)
   : All-in-One DER Diagnostic
@@ -146,9 +243,11 @@ MIT
 - [`der_classify()`](https://joonho112.github.io/svyder/reference/der_classify.md)
   : Classify Parameters by Design Sensitivity
 - [`der_correct()`](https://joonho112.github.io/svyder/reference/der_correct.md)
-  : Apply Selective Cholesky Correction
+  : Apply Selective Correction to Flagged Parameters
 
-## Analysis Tools
+## Analysis
+
+Understand, verify, and re-target DER results.
 
 - [`der_decompose()`](https://joonho112.github.io/svyder/reference/der_decompose.md)
   : Decompose DER into Components
@@ -157,102 +256,153 @@ MIT
 - [`der_theorem_check()`](https://joonho112.github.io/svyder/reference/der_theorem_check.md)
   : Verify Theoretical DER Predictions
 - [`der_compare()`](https://joonho112.github.io/svyder/reference/der_compare.md)
-  : Compare DER Across Clustering Definitions
+  : Compare DER Across Variance Targets
 
-## Output Methods
+## Object methods
+
+S3 methods for `svyder` objects: printing, summaries, corrected draws,
+and broom-style tidiers.
 
 - [`print(`*`<svyder>`*`)`](https://joonho112.github.io/svyder/reference/print.svyder.md)
   : Print a svyder Object
 - [`summary(`*`<svyder>`*`)`](https://joonho112.github.io/svyder/reference/summary.svyder.md)
   : Summarize a svyder Object
-- [`tidy.svyder()`](https://joonho112.github.io/svyder/reference/tidy.svyder.md)
+- [`tidy(`*`<svyder>`*`)`](https://joonho112.github.io/svyder/reference/tidy.svyder.md)
   : Tidy a svyder Object
-- [`glance.svyder()`](https://joonho112.github.io/svyder/reference/glance.svyder.md)
+- [`glance(`*`<svyder>`*`)`](https://joonho112.github.io/svyder/reference/glance.svyder.md)
   : Glance at a svyder Object
 - [`as.matrix(`*`<svyder>`*`)`](https://joonho112.github.io/svyder/reference/as.matrix.svyder.md)
   : Extract Draws Matrix from a svyder Object
+- [`is.svyder()`](https://joonho112.github.io/svyder/reference/is.svyder.md)
+  : Test if an Object is a svyder Object
 
 ## Visualization
+
+Diagnostic plots for DER results: profile, decomposition, and comparison
+views, with an automatic ggplot2 / base R fallback.
 
 - [`plot(`*`<svyder>`*`)`](https://joonho112.github.io/svyder/reference/plot.svyder.md)
   : Plot DER Diagnostic Results
 - [`autoplot.svyder()`](https://joonho112.github.io/svyder/reference/autoplot.svyder.md)
   : Create a ggplot2 Visualization of DER Results
 
-## Backend Integration
+## Backends
+
+Generic extractors for posterior draws and survey design objects.
+Methods exist for brms, cmdstanr, rstanarm, posterior, and the survey
+package.
 
 - [`extract_draws()`](https://joonho112.github.io/svyder/reference/extract_draws.md)
   : Extract Posterior Draws from Model Objects
 - [`extract_design()`](https://joonho112.github.io/svyder/reference/extract_design.md)
   : Extract Survey Design Information
 
-## Classes
+## Bundled datasets
 
-- [`new_svyder()`](https://joonho112.github.io/svyder/reference/new_svyder.md)
-  : Low-Level Constructor for svyder Objects
-- [`validate_svyder()`](https://joonho112.github.io/svyder/reference/validate_svyder.md)
-  : Validate a svyder Object
-- [`is.svyder()`](https://joonho112.github.io/svyder/reference/is.svyder.md)
-  : Test if an Object is a svyder Object
-
-## Datasets
+Synthetic datasets shipping pre-computed posterior draws, so no Stan
+installation is required.
 
 - [`nsece_demo`](https://joonho112.github.io/svyder/reference/nsece_demo.md)
   : Synthetic NSECE-Like Survey Data
 - [`sim_hlr`](https://joonho112.github.io/svyder/reference/sim_hlr.md) :
   Simulated Hierarchical Linear Regression Data
 
+## Package
+
+- [`svyder`](https://joonho112.github.io/svyder/reference/svyder-package.md)
+  [`svyder-package`](https://joonho112.github.io/svyder/reference/svyder-package.md)
+  : svyder: Design Effect Ratio Diagnostics for Bayesian Survey Models
+
 # Articles
 
-### Getting Started
+### Applied track
+
+Workflow-first guides for using svyder in practice — run the pipeline,
+choose the variance target, and report results.
 
 - [Getting Started with
   svyder](https://joonho112.github.io/svyder/articles/getting-started.md):
 
-  A hands-on introduction to Design Effect Ratio diagnostics with
-  svyder: run the full pipeline in one call, interpret the three-tier
-  classification, visualize DER profiles, extract corrected posterior
-  draws, and build a pipe-friendly workflow — all using bundled
-  datasets.
+  Run the full compute-classify-correct DER pipeline in about five
+  minutes on bundled survey data, then read, tidy, plot, and extract the
+  corrected draws.
 
-### Theory
+- [Choosing the Variance
+  Target](https://joonho112.github.io/svyder/articles/choosing-the-target.md):
 
-- [Understanding Design Effect
-  Ratios](https://joonho112.github.io/svyder/articles/understanding-der.md):
-
-  A deep dive into the Design Effect Ratio (DER) framework: definition
-  and three regimes, why parameters differ in design sensitivity, the
-  decomposition theorems linking DER to Kish DEFF and hierarchical
-  shrinkage, the conservation law, three-tier classification, threshold
-  sensitivity, and comparison between complex survey and equal-weight
-  data.
-
-- [Decomposition Theorems: Why DER Differs Across
-  Parameters](https://joonho112.github.io/svyder/articles/decomposition-theorems.md):
-
-  A deep dive into the DER decomposition theorems: understand why
-  different parameters have different design sensitivities, verify the
-  closed-form approximations against empirical values, and explore the
-  conservation law that links hierarchical shrinkage to survey design
-  effects.
-
-### Applications
+  The one modeling decision the Design Effect Ratio forces you to make:
+  what is the sandwich aggregation unit? This vignette contrasts the two
+  canonical targets (design-PSU vs model-group) on the bundled
+  NSECE-style demo, walks through der_compare(), and explains how
+  strata, the finite-cluster correction, the cluster universe, and the
+  weight convention all become part of the variance target you declare.
 
 - [The Compute-Classify-Correct
-  Pipeline](https://joonho112.github.io/svyder/articles/pipeline-in-depth.md):
+  Pipeline](https://joonho112.github.io/svyder/articles/pipeline.md):
 
-  A comprehensive walkthrough of the three-step DER diagnostic pipeline:
-  compute sandwich-based DER values, classify parameters into tiers with
-  threshold-based flagging, and apply selective Cholesky correction to
-  flagged parameters only. Includes sensitivity analysis,
-  cross-clustering comparison, and practical guidance for working with
-  corrected posterior draws.
+  A step-by-step tour of the svyder workflow: der_compute() builds the
+  declared variance target and per-parameter DERs, der_classify() flags
+  the parameters that need correction at a threshold tau, and
+  der_correct() rescales only those parameters while leaving everything
+  else bitwise untouched. Covers der_diagnose() as the one-call
+  shortcut, threshold sensitivity, and why selective correction beats a
+  blanket adjustment.
 
-- [Case Study: NSECE Survey Data
-  Analysis](https://joonho112.github.io/svyder/articles/case-study-nsece.md):
+- [Case Study: NSECE-Style Survey
+  Data](https://joonho112.github.io/svyder/articles/case-study-nsece.md):
 
-  A comprehensive case study demonstrating the full DER diagnostic
-  workflow on NSECE-like survey data: explore the survey design, run
-  diagnostics, interpret fixed and random effect results, verify
-  decomposition theorems, compare selective vs blanket correction, and
-  report results for publication.
+  A complete, start-to-finish DER analysis on the bundled synthetic
+  NSECE-style survey data: explore the design, run the diagnostic,
+  interpret fixed and random effects, read the decomposition, correct
+  selectively, compare variance targets, and write up the result for
+  publication.
+
+- [Backends: brms, cmdstanr, rstanarm, and
+  survey](https://joonho112.github.io/svyder/articles/backends.md):
+
+  How to feed svyder from fitted model objects instead of a raw draws
+  matrix. Covers the extract_draws() and extract_design() generics, what
+  each backend (brms, cmdstanr, rstanarm, posterior, survey)
+  auto-extracts, and what you must always supply yourself — above all,
+  the cluster aggregation unit.
+
+### Method track
+
+The mathematical foundations of the DER framework, for readers who want
+the derivations.
+
+- [The Design Effect Ratio: Definition and
+  Regimes](https://joonho112.github.io/svyder/articles/theory-der.md):
+
+  A methodological introduction to the parameter-level Design Effect
+  Ratio (DER): how it generalises the Kish design effect to Bayesian
+  hierarchical models, the three regimes it distinguishes, and the
+  information-source intuition behind why parameters inherit design
+  effects so differently.
+
+- [The Declared Variance Target: Bread and
+  Meat](https://joonho112.github.io/svyder/articles/theory-sandwich.md):
+
+  How svyder constructs the design-based sandwich covariance target that
+  sits in the numerator of every Design Effect Ratio: the
+  penalized-posterior bread, the cluster-aggregated meat, the weight and
+  aggregation conventions that make the target a well-defined estimand,
+  and the v0.2.0 gaussian score fix.
+
+- [Decomposition Theorems and the Conservation
+  Law](https://joonho112.github.io/svyder/articles/theory-decomposition.md):
+
+  The mathematical centerpiece of svyder: under a balanced conjugate
+  Gaussian model the Design Effect Ratio admits exact closed forms. This
+  article states Theorems 1-2 and the conservation law, and verifies
+  them numerically.
+
+- [Classification and Selective
+  Correction](https://joonho112.github.io/svyder/articles/theory-classification-correction.md):
+
+  How the Design Effect Ratio turns a per-parameter diagnostic into a
+  decision: the four-tier classification of parameters, the threshold
+  that separates survey-sensitive parameters from protected ones, and
+  the selective block-Cholesky correction (Algorithm 1) that widens only
+  the intervals that need widening while leaving shrinkage-protected
+  parameters untouched.

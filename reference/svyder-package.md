@@ -9,8 +9,8 @@ implements a compute-classify-correct diagnostic framework:
 1.  **Compute**: Calculate DER for each parameter using a sandwich
     variance estimator.
 
-2.  **Classify**: Assign parameters to three tiers based on their
-    information source and flag those exceeding a threshold.
+2.  **Classify**: Assign estimable parameters by information source and
+    flag those exceeding a threshold.
 
 3.  **Correct**: Apply selective Cholesky correction to flagged
     parameters only.
@@ -21,7 +21,7 @@ implements a compute-classify-correct diagnostic framework:
   Compute DER values.
 
 - [`der_classify()`](https://joonho112.github.io/svyder/reference/der_classify.md):
-  Three-tier classification.
+  Estimable-parameter classification.
 
 - [`der_correct()`](https://joonho112.github.io/svyder/reference/der_correct.md):
   Selective Cholesky correction.
@@ -68,9 +68,18 @@ implements a compute-classify-correct diagnostic framework:
 - [sim_hlr](https://joonho112.github.io/svyder/reference/sim_hlr.md):
   Balanced hierarchical linear regression (gaussian, J=10).
 
+## References
+
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. *Journal of Survey Statistics and
+Methodology*. Submitted.
+
 ## See also
 
 Useful links:
+
+- <https://joonho112.github.io/svyder/>
 
 - <https://github.com/joonho112/svyder>
 
@@ -80,3 +89,8 @@ Useful links:
 
 **Maintainer**: JoonHo Lee <jlee296@ua.edu>
 ([ORCID](https://orcid.org/0009-0006-4019-8703))
+
+Authors:
+
+- JoonHo Lee <jlee296@ua.edu>
+  ([ORCID](https://orcid.org/0009-0006-4019-8703))

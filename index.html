@@ -5,19 +5,22 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Design Effect Ratio Diagnostics for Bayesian Survey Models • svyder</title>
+<title>svyder: Design Effect Ratio Diagnostics for Bayesian Survey Models • svyder</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="icon" sizes="any" href="favicon.ico">
 <link rel="manifest" href="site.webmanifest">
-<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<!-- katex math --><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script><script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous" onload="renderMathInElement(document.body);"></script><script src="katex-auto.js"></script><script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Design Effect Ratio Diagnostics for Bayesian Survey Models">
-<meta name="description" content="Computes parameter-level Design Effect Ratios (DER) for Bayesian hierarchical models fitted to complex survey data. Implements the compute-classify-correct diagnostic framework: identifies which model parameters are sensitive to the survey design, classifies them into tiers based on their information source, and applies selective Cholesky correction to flagged parameters only. Supports integration with brms, cmdstanr, rstanarm, and the survey package.">
-<meta property="og:description" content="Computes parameter-level Design Effect Ratios (DER) for Bayesian hierarchical models fitted to complex survey data. Implements the compute-classify-correct diagnostic framework: identifies which model parameters are sensitive to the survey design, classifies them into tiers based on their information source, and applies selective Cholesky correction to flagged parameters only. Supports integration with brms, cmdstanr, rstanarm, and the survey package.">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="svyder: Design Effect Ratio Diagnostics for Bayesian Survey Models">
+<meta name="description" content="Compute parameter-level Design Effect Ratios (DER) for Bayesian hierarchical models fitted to complex survey data, and correct only the parameters that need it with the compute-classify-correct framework.
+">
+<meta property="og:description" content="Compute parameter-level Design Effect Ratios (DER) for Bayesian hierarchical models fitted to complex survey data, and correct only the parameters that need it with the compute-classify-correct framework.
+">
 <meta property="og:image" content="https://joonho112.github.io/svyder/logo.svg">
 </head>
 <body>
@@ -28,7 +31,7 @@
 
     <a class="navbar-brand me-2" href="index.html">svyder</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,8 +40,25 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link" href="articles/getting-started.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
-<li class="nav-item"><a class="nav-link" href="articles/index.html">Articles</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><h6 class="dropdown-header" data-toc-skip>--- Applied track ---</h6></li>
+    <li><a class="dropdown-item" href="articles/getting-started.html">Getting Started with svyder</a></li>
+    <li><a class="dropdown-item" href="articles/choosing-the-target.html">Choosing the Variance Target</a></li>
+    <li><a class="dropdown-item" href="articles/pipeline.html">The Compute-Classify-Correct Pipeline</a></li>
+    <li><a class="dropdown-item" href="articles/case-study-nsece.html">Case Study: NSECE-Style Survey Data</a></li>
+    <li><a class="dropdown-item" href="articles/backends.html">Backends: brms, cmdstanr, rstanarm, survey</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>--- Method track ---</h6></li>
+    <li><a class="dropdown-item" href="articles/theory-der.html">The Design Effect Ratio: Definition and Regimes</a></li>
+    <li><a class="dropdown-item" href="articles/theory-sandwich.html">The Declared Variance Target: Bread and Meat</a></li>
+    <li><a class="dropdown-item" href="articles/theory-decomposition.html">Decomposition Theorems and the Conservation Law</a></li>
+    <li><a class="dropdown-item" href="articles/theory-classification-correction.html">Classification and Selective Correction</a></li>
+  </ul>
+</li>
+<li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -58,186 +78,273 @@
 </h1>
 </div>
 <!-- badges: start -->
-<!-- badges: end -->
-<p><strong>Design Effect Ratio Diagnostics for Bayesian Survey Models</strong> – <em>Which parameters need survey correction?</em></p>
+
+<p><strong>Design Effect Ratio diagnostics for Bayesian survey models</strong> — <em>which parameters actually need a survey-design correction, and which are better left alone?</em></p>
 <div class="section level2">
-<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+<h2 id="the-problem">The problem<a class="anchor" aria-label="anchor" href="#the-problem"></a>
 </h2>
-<p>When Bayesian hierarchical models are fitted to complex survey data, not all parameters are equally affected by the survey design. Some parameters (e.g., within-cluster covariates) are highly sensitive to unequal weighting and clustering, while others (e.g., random effects) are naturally protected by hierarchical shrinkage.</p>
-<p><strong>svyder</strong> computes parameter-level Design Effect Ratios (DER) that quantify how much each parameter’s posterior variance should change when the survey design is properly accounted for. It implements a three-step compute-classify-correct pipeline: DER values near 1 indicate well-calibrated posteriors; values substantially above 1 indicate underestimation of uncertainty.</p>
+<p>When you fit a Bayesian hierarchical model to complex survey data — a weighted pseudo-posterior — the posterior does not automatically reflect the sampling design. The usual repair is to rescale the whole posterior toward a design-based <strong>sandwich</strong> variance. Applied to <em>every</em> parameter that is a mistake: a within-group covariate genuinely needs its interval widened, but a shrinkage-protected random effect or a between-group coefficient gets its already-narrow interval crushed.</p>
+<p><strong>svyder</strong> computes a per-parameter <strong>Design Effect Ratio (DER)</strong> — the ratio of a parameter’s design-based sandwich variance to its model posterior variance — and uses it to correct only the parameters that need it.</p>
+<ul>
+<li>
+<strong>DER &gt; 1</strong> — the posterior understates design uncertainty → widen it.</li>
+<li>
+<strong>DER ≈ 1</strong> — already calibrated → leave it alone.</li>
+<li>
+<strong>DER &lt; 1</strong> — the posterior is already wider than the target → correcting would wrongly <em>narrow</em> it and destroy the shrinkage protection.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="when-should-i-use-svyder">When should I use svyder?<a class="anchor" aria-label="anchor" href="#when-should-i-use-svyder"></a>
+</h2>
+<ul>
+<li>You fit a Bayesian hierarchical / multilevel model to data from a complex survey (unequal weights, clustering, stratification).</li>
+<li>You want to know <strong>which</strong> coefficients and random effects are sensitive to the design — not just a single global design effect.</li>
+<li>You want a defensible, <strong>selective</strong> correction rather than a blanket rescaling of the whole posterior.</li>
+</ul>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>You can install the development version of svyder from <a href="https://github.com/joonho112/svyder" class="external-link">GitHub</a>:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"joonho112/svyder"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="quick-demo-5-minutes">Quick Demo (5 minutes)<a class="anchor" aria-label="anchor" href="#quick-demo-5-minutes"></a>
+<h2 id="quick-start-5-minutes-no-stan-required">Quick start (5 minutes, no Stan required)<a class="anchor" aria-label="anchor" href="#quick-start-5-minutes-no-stan-required"></a>
 </h2>
+<p>svyder ships two datasets with <strong>pre-computed posterior draws</strong>, so you can run the whole pipeline immediately.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://joonho112.github.io/svyder/">svyder</a></span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">nsece_demo</span><span class="op">)</span>   <span class="co"># synthetic, NSECE-like survey data: 6,785 units, 51 states, 644 PSUs</span></span>
 <span></span>
-<span><span class="co"># Load bundled NSECE-like survey data</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">nsece_demo</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Run the full DER diagnostic pipeline</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/der_diagnose.html">der_diagnose</a></span><span class="op">(</span></span>
 <span>  <span class="va">nsece_demo</span><span class="op">$</span><span class="va">draws</span>,</span>
-<span>  y <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">y</span>,</span>
-<span>  X <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">X</span>,</span>
-<span>  group <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">group</span>,</span>
+<span>  y <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">y</span>, X <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">X</span>,</span>
+<span>  group   <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">group</span>,</span>
 <span>  weights <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">weights</span>,</span>
-<span>  psu <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">psu</span>,</span>
-<span>  family <span class="op">=</span> <span class="st">"binomial"</span>,</span>
+<span>  cluster <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">psu</span>,          <span class="co"># the design PSU  -&gt;  a *design-based* target</span></span>
+<span>  family  <span class="op">=</span> <span class="st">"binomial"</span>,</span>
 <span>  sigma_theta <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">sigma_theta</span>,</span>
-<span>  param_types <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">param_types</span></span>
+<span>  param_types <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">param_types</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Print summary</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span></code></pre></div>
-<p>The output shows which parameters are flagged for correction:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>svyder <span class="fu">diagnostic</span> (<span class="dv">54</span> parameters)</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  Family<span class="sc">:</span> binomial <span class="sc">|</span> N <span class="ot">=</span> <span class="dv">6785</span> <span class="sc">|</span> J <span class="ot">=</span> <span class="dv">51</span></span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  DER range<span class="sc">:</span> [<span class="fl">0.026</span>, <span class="fl">3.891</span>]</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="fu">Threshold</span> (tau)<span class="sc">:</span> <span class="fl">1.20</span></span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  Flagged<span class="sc">:</span> <span class="dv">2</span> <span class="sc">/</span> <span class="dv">54</span> (<span class="fl">3.7</span>%)</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  Flagged parameters<span class="sc">:</span></span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    beta[<span class="dv">1</span>]              DER <span class="ot">=</span> <span class="fl">1.465</span>  [I<span class="sc">-</span>b] <span class="ot">-&gt;</span> CORRECT</span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    beta[<span class="dv">2</span>]              DER <span class="ot">=</span> <span class="fl">3.891</span>  [I<span class="sc">-</span>a] <span class="ot">-&gt;</span> CORRECT</span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a></span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>  Correction applied<span class="sc">:</span> <span class="dv">2</span> <span class="fu">parameter</span>(s) rescaled</span></code></pre></div>
+<span><span class="va">result</span></span>
+<span><span class="co">#&gt; svyder diagnostic (54 parameters)</span></span>
+<span><span class="co">#&gt;   Family: binomial | N = 6785 | J = 51</span></span>
+<span><span class="co">#&gt;   Target: 644 cluster(s) | meat: centered, DF-corrected | weights: unit_mean</span></span>
+<span><span class="co">#&gt;   DER range: [0.235, 5.308]</span></span>
+<span><span class="co">#&gt;   Tier III (DER undefined): sigma_theta</span></span>
+<span><span class="co">#&gt;   Threshold (tau): 1.20</span></span>
+<span><span class="co">#&gt;   Flagged: 30 / 54 (55.6%)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;   Flagged parameters:</span></span>
+<span><span class="co">#&gt;     beta[2]              DER = 2.689  [I-a] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     theta[1]             DER = 3.386  [II] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     theta[4]             DER = 2.210  [II] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     theta[5]             DER = 1.568  [II] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     theta[6]             DER = 2.104  [II] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     theta[7]             DER = 2.232  [II] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     theta[9]             DER = 5.308  [II] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     theta[11]            DER = 2.655  [II] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     theta[15]            DER = 1.576  [II] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     theta[18]            DER = 4.025  [II] -&gt; CORRECT</span></span>
+<span><span class="co">#&gt;     ... and 20 more</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;   Correction applied: 30 parameter(s) rescaled</span></span>
+<span><span class="co">#&gt;   Compute time: 0.023 sec</span></span></code></pre></div>
+<p><code><a href="reference/der_diagnose.html">der_diagnose()</a></code> runs the three-step <strong>compute → classify → correct</strong> pipeline in one call.</p>
+<div class="section level3">
+<h3 id="which-parameters-were-flagged">Which parameters were flagged?<a class="anchor" aria-label="anchor" href="#which-parameters-were-flagged"></a>
+</h3>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>   <span class="co"># the three fixed effects</span></span>
+<span><span class="co">#&gt;            term   estimate  std.error       der tier  action flagged</span></span>
+<span><span class="co">#&gt; beta[1] beta[1]  0.2498445 0.14735061 0.2626885  I-b  retain   FALSE</span></span>
+<span><span class="co">#&gt; beta[2] beta[2] -0.1494408 0.02604573 2.6894416  I-a CORRECT    TRUE</span></span>
+<span><span class="co">#&gt; beta[3] beta[3]  0.1610078 0.20239837 0.3430527  I-b  retain   FALSE</span></span>
+<span><span class="co">#&gt;         scale_factor</span></span>
+<span><span class="co">#&gt; beta[1]     1.000000</span></span>
+<span><span class="co">#&gt; beta[2]     1.639952</span></span>
+<span><span class="co">#&gt; beta[3]     1.000000</span></span></code></pre></div>
+<p>The within-state poverty coefficient (<code>beta[2]</code>) is flagged — Tier I-a, DER ≈ 2.7 — and its posterior is widened. The two between-state coefficients sit well below the threshold and are left untouched (Tier I-b).</p>
 </div>
-<div class="section level2">
-<h2 id="der-profile-plot">DER Profile Plot<a class="anchor" aria-label="anchor" href="#der-profile-plot"></a>
-</h2>
-<p>Visualize the DER values across all parameters with tier-based coloring:</p>
+<div class="section level3">
+<h3 id="the-der-profile">The DER profile<a class="anchor" aria-label="anchor" href="#the-der-profile"></a>
+</h3>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">result</span>, type <span class="op">=</span> <span class="st">"profile"</span><span class="op">)</span></span></code></pre></div>
+<p><img src="reference/figures/README-profile-1.png" alt="" width="100%"></p>
+</div>
 </div>
 <div class="section level2">
-<h2 id="decomposition">Decomposition<a class="anchor" aria-label="anchor" href="#decomposition"></a>
+<h2 id="how-to-read-the-output">How to read the output<a class="anchor" aria-label="anchor" href="#how-to-read-the-output"></a>
 </h2>
-<p>Understand <em>why</em> each parameter has its observed DER:</p>
+<ul>
+<li>
+<strong>DER</strong> — design-based variance ÷ posterior variance, for each parameter.</li>
+<li>
+<strong>Tier</strong> — <strong>I-a</strong> within-group fixed effects (most exposed), <strong>I-b</strong> between-group fixed effects (shielded by shrinkage), <strong>II</strong> random effects (shrinkage-protected), <strong>III</strong> hyperparameters (excluded by construction).</li>
+<li>
+<strong>flagged / action</strong> — DER above the threshold (default <code>tau = 1.2</code>) → the parameter is corrected; otherwise it is retained unchanged.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="the-one-decision-you-must-make-the-variance-target">The one decision you must make: the variance target<a class="anchor" aria-label="anchor" href="#the-one-decision-you-must-make-the-variance-target"></a>
+</h2>
+<p><code>cluster</code> is <strong>required</strong> and has no default, because the sandwich aggregation unit is part of the estimand — the answer can change materially between a <strong>design-PSU</strong> target and a <strong>model-group</strong> target. Report both with <code><a href="reference/der_compare.html">der_compare()</a></code>:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">decomp</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/der_decompose.html">der_decompose</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">decomp</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"param"</span>, <span class="st">"param_type"</span>, <span class="st">"der"</span>, <span class="st">"der_predicted"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">comp</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/der_compare.html">der_compare</a></span><span class="op">(</span><span class="va">result</span>, clusters <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  design_psu  <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">psu</span>,</span>
+<span>  model_group <span class="op">=</span> <span class="va">nsece_demo</span><span class="op">$</span><span class="va">group</span></span>
+<span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">comp</span>, <span class="va">param</span> <span class="op">==</span> <span class="st">"beta[2]"</span><span class="op">)</span>   <span class="co"># poverty coefficient under both targets</span></span>
+<span><span class="co">#&gt;      param cluster_name      der</span></span>
+<span><span class="co">#&gt; 2  beta[2]   design_psu 2.689442</span></span>
+<span><span class="co">#&gt; 56 beta[2]  model_group 1.892591</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="tidy-output">Tidy Output<a class="anchor" aria-label="anchor" href="#tidy-output"></a>
+<h2 id="key-features">Key features<a class="anchor" aria-label="anchor" href="#key-features"></a>
 </h2>
-<p>svyder integrates with the tidyverse via broom-style methods:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Per-parameter summary</span></span>
-<span><span class="va">tidy_df</span> <span class="op">&lt;-</span> <span class="fu">tidy</span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">tidy_df</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Model-level summary</span></span>
-<span><span class="fu">glance</span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span></code></pre></div>
+<ul>
+<li>Per-parameter DER with a four-tier classification and <strong>selective block-Cholesky</strong> correction — unflagged parameters are left bitwise unchanged.</li>
+<li>The <strong>declared variance target</strong> is explicit and recorded in the result: aggregation unit, strata, weight convention, and bread convention.</li>
+<li>Closed-form <strong>decomposition</strong> (<code><a href="reference/der_decompose.html">der_decompose()</a></code>) and theorem checks (<code><a href="reference/der_theorem_check.html">der_theorem_check()</a></code>) linking DER to the Kish design effect and hierarchical shrinkage.</li>
+<li>Works from a plain draws matrix or directly from <strong>brms</strong>, <strong>cmdstanr</strong>, <strong>rstanarm</strong>, and the <strong>survey</strong> package.</li>
+<li>broom-style <code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> / <code><a href="https://generics.r-lib.org/reference/glance.html" class="external-link">glance()</a></code> and profile / decomposition / comparison plots.</li>
+</ul>
 </div>
 <div class="section level2">
-<h2 id="backend-support">Backend Support<a class="anchor" aria-label="anchor" href="#backend-support"></a>
+<h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
-<p>svyder works with multiple Bayesian modeling backends:</p>
-<table style="width:100%;" class="table">
+<p>Two tracks of vignettes — hands-on workflows and the mathematical foundations (<a href="https://joonho112.github.io/svyder/" class="uri">https://joonho112.github.io/svyder/</a>).</p>
+<p><strong>Applied track</strong></p>
+<table class="table">
 <colgroup>
-<col width="13%">
-<col width="39%">
-<col width="46%">
+<col width="50%">
+<col width="50%">
 </colgroup>
-<thead><tr class="header">
-<th>Backend</th>
-<th>
-<code><a href="reference/der_compute.html">der_compute()</a></code> method</th>
-<th>Auto-detection</th>
+<thead><tr>
+<th>Article</th>
+<th>What it covers</th>
 </tr></thead>
 <tbody>
-<tr class="odd">
-<td>Matrix</td>
-<td><code><a href="reference/der_compute.html">der_compute.matrix()</a></code></td>
-<td>–</td>
+<tr>
+<td><a href="https://joonho112.github.io/svyder/articles/getting-started.html">Getting Started</a></td>
+<td>the whole pipeline in five minutes</td>
 </tr>
-<tr class="even">
-<td>brms</td>
-<td><code><a href="reference/der_compute.html">der_compute.brmsfit()</a></code></td>
-<td>y, X, group, family, sigma_theta</td>
+<tr>
+<td><a href="https://joonho112.github.io/svyder/articles/choosing-the-target.html">Choosing the Variance Target</a></td>
+<td>design-PSU vs model-group, weights, strata</td>
 </tr>
-<tr class="odd">
-<td>cmdstanr</td>
-<td><code><a href="reference/der_compute.html">der_compute.CmdStanMCMC()</a></code></td>
-<td>–</td>
+<tr>
+<td><a href="https://joonho112.github.io/svyder/articles/pipeline.html">The Compute–Classify–Correct Pipeline</a></td>
+<td>the three steps in depth</td>
 </tr>
-<tr class="even">
-<td>rstanarm</td>
-<td><code><a href="reference/der_compute.html">der_compute.stanreg()</a></code></td>
-<td>y, X, group, family, sigma_theta</td>
+<tr>
+<td><a href="https://joonho112.github.io/svyder/articles/case-study-nsece.html">Case Study: NSECE-Style Survey Data</a></td>
+<td>a full worked analysis</td>
+</tr>
+<tr>
+<td><a href="https://joonho112.github.io/svyder/articles/backends.html">Backends</a></td>
+<td>brms, cmdstanr, rstanarm, survey</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Method track</strong></p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr>
+<th>Article</th>
+<th>What it covers</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><a href="https://joonho112.github.io/svyder/articles/theory-der.html">The Design Effect Ratio</a></td>
+<td>definition and the three regimes</td>
+</tr>
+<tr>
+<td><a href="https://joonho112.github.io/svyder/articles/theory-sandwich.html">The Declared Variance Target</a></td>
+<td>the bread and meat of the sandwich</td>
+</tr>
+<tr>
+<td><a href="https://joonho112.github.io/svyder/articles/theory-decomposition.html">Decomposition Theorems</a></td>
+<td>Theorems 1–2 and the conservation law</td>
+</tr>
+<tr>
+<td><a href="https://joonho112.github.io/svyder/articles/theory-classification-correction.html">Classification and Selective Correction</a></td>
+<td>tiers and block-Cholesky correction</td>
 </tr>
 </tbody>
 </table>
 </div>
 <div class="section level2">
-<h2 id="key-functions">Key Functions<a class="anchor" aria-label="anchor" href="#key-functions"></a>
+<h2 id="backend-support">Backend support<a class="anchor" aria-label="anchor" href="#backend-support"></a>
 </h2>
 <table class="table">
 <colgroup>
-<col width="30%">
-<col width="69%">
+<col width="33%">
+<col width="33%">
+<col width="33%">
 </colgroup>
-<thead><tr class="header">
-<th>Function</th>
-<th>Purpose</th>
+<thead><tr>
+<th>Backend</th>
+<th>
+<code><a href="reference/der_compute.html">der_compute()</a></code> method</th>
+<th>Auto-extracts</th>
 </tr></thead>
 <tbody>
-<tr class="odd">
-<td><code><a href="reference/der_diagnose.html">der_diagnose()</a></code></td>
-<td>All-in-one pipeline (compute + classify + correct)</td>
+<tr>
+<td>draws matrix</td>
+<td><code><a href="reference/der_compute.html">der_compute.matrix()</a></code></td>
+<td>— (you supply everything)</td>
 </tr>
-<tr class="even">
-<td><code><a href="reference/der_compute.html">der_compute()</a></code></td>
-<td>Compute DER values</td>
+<tr>
+<td>brms</td>
+<td><code><a href="reference/der_compute.html">der_compute.brmsfit()</a></code></td>
+<td>
+<code>y</code>, <code>X</code>, <code>group</code>, <code>family</code>, <code>sigma_theta</code>
+</td>
 </tr>
-<tr class="odd">
-<td><code><a href="reference/der_classify.html">der_classify()</a></code></td>
-<td>Three-tier classification</td>
+<tr>
+<td>cmdstanr</td>
+<td><code><a href="reference/der_compute.html">der_compute.CmdStanMCMC()</a></code></td>
+<td>draws only (you supply the data)</td>
 </tr>
-<tr class="even">
-<td><code><a href="reference/der_correct.html">der_correct()</a></code></td>
-<td>Selective Cholesky correction</td>
+<tr>
+<td>rstanarm</td>
+<td><code><a href="reference/der_compute.html">der_compute.stanreg()</a></code></td>
+<td>
+<code>y</code>, <code>X</code>, <code>group</code>, <code>family</code>, <code>sigma_theta</code>
+</td>
 </tr>
-<tr class="odd">
-<td><code><a href="reference/der_decompose.html">der_decompose()</a></code></td>
-<td>Decompose DER into DEFF, B, R_k, kappa</td>
-</tr>
-<tr class="even">
-<td><code><a href="reference/der_sensitivity.html">der_sensitivity()</a></code></td>
-<td>Threshold sensitivity analysis</td>
-</tr>
-<tr class="odd">
-<td><code><a href="reference/der_theorem_check.html">der_theorem_check()</a></code></td>
-<td>Verify theoretical predictions</td>
-</tr>
-<tr class="even">
-<td><code><a href="reference/der_compare.html">der_compare()</a></code></td>
-<td>Compare across clustering definitions</td>
+<tr>
+<td>survey</td>
+<td><code><a href="reference/extract_design.html">extract_design()</a></code></td>
+<td>
+<code>weights</code>, <code>cluster</code>, <code>strata</code>
+</td>
 </tr>
 </tbody>
 </table>
+<p>You always supply the variance target (<code>cluster</code>, and <code>strata</code> if applicable).</p>
 </div>
 <div class="section level2">
 <h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
 </h2>
-<p>If you use svyder in your research, please cite:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/citation.html" class="external-link">citation</a></span><span class="op">(</span><span class="st">"svyder"</span><span class="op">)</span></span></code></pre></div>
 <blockquote>
-<p>Lee, J. (2026). Design Effect Ratios for Bayesian Survey Models: A Diagnostic Framework for Identifying Survey-Sensitive Parameters. <em>arXiv preprint</em>.</p>
+<p>Lee, J., Williams, M. R., &amp; Savitsky, T. D. (2026). <em>Design Effect Ratios for Bayesian Survey Models: A Diagnostic Framework for Identifying Survey-Sensitive Parameters.</em> Journal of Survey Statistics and Methodology. Submitted.</p>
 </blockquote>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>
 </h2>
-<p>MIT</p>
+<p>MIT © JoonHo Lee — Assistant Professor, The University of Alabama (<a href="https://orcid.org/0009-0006-4019-8703" class="external-link">ORCID 0009-0006-4019-8703</a>).</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -267,18 +374,26 @@
 <div class="developers">
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
-<li>JoonHo Lee <br><small class="roles"> Author, maintainer </small> <a href="https://orcid.org/0009-0006-4019-8703" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
+<li>
+<a href="https://github.com/joonho112" class="external-link">JoonHo Lee</a> <br><small class="roles"> Author, maintainer </small> <a href="https://orcid.org/0009-0006-4019-8703" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
 </ul>
 </div>
 
-
+<div class="dev-status">
+<h2 data-toc-skip>Dev status</h2>
+<ul class="list-unstyled">
+<li><a href="https://lifecycle.r-lib.org/articles/stages.html#experimental" class="external-link"><img src="https://img.shields.io/badge/lifecycle-experimental-orange.svg" alt="Lifecycle: experimental"></a></li>
+<li><a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a></li>
+<li><a href="https://github.com/joonho112/svyder/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/joonho112/svyder/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
+</ul>
+</div>
 
   </aside>
 </div>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by JoonHo Lee.</p>
+  <p>Developed by <a href="https://github.com/joonho112" class="external-link">JoonHo Lee</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

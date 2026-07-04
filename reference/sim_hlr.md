@@ -1,9 +1,9 @@
 # Simulated Hierarchical Linear Regression Data
 
-A small balanced Gaussian hierarchical model dataset for quick testing
-and demonstration. Contains J = 10 groups with n_j = 20 observations
-each (N = 200 total), equal weights (DEFF = 1), and two fixed-effect
-covariates (intercept + within-cluster covariate).
+A small, fully **synthetic** balanced Gaussian hierarchical model
+dataset for quick testing and demonstration. Contains J = 10 groups with
+n_j = 20 observations each (N = 200 total), equal weights (DEFF = 1),
+and two fixed-effect covariates (intercept + within-cluster covariate).
 
 ## Usage
 
@@ -85,6 +85,18 @@ Synthetic data. See `data-raw/generate_sim_hlr.R`.
 With equal weights the design effect is 1.0, so DER values should be
 close to 1.0 across all parameters. This dataset is useful for verifying
 that the pipeline correctly identifies the absence of design effects.
+
+## References
+
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. *Journal of Survey Statistics and
+Methodology*. Submitted.
+
+## See also
+
+Other datasets:
+[`nsece_demo`](https://joonho112.github.io/svyder/reference/nsece_demo.md)
 
 ## Examples
 

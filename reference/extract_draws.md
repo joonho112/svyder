@@ -78,6 +78,18 @@ Methods are provided for `matrix` (identity), `brmsfit`, `CmdStanMCMC`,
 `stanreg`, `draws_matrix`, `draws_df`, `draws_array`, `draws_list`, and
 `draws_rvars`.
 
+## References
+
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. *Journal of Survey Statistics and
+Methodology*. Submitted.
+
+Rabe-Hesketh, S., & Skrondal, A. (2006). Multilevel modelling of complex
+survey data. *Journal of the Royal Statistical Society: Series A*,
+169(4), 805–827.
+[doi:10.1111/j.1467-985X.2006.00426.x](https://doi.org/10.1111/j.1467-985X.2006.00426.x)
+
 ## See also
 
 [`extract_design()`](https://joonho112.github.io/svyder/reference/extract_design.md)
@@ -85,7 +97,7 @@ for extracting survey design information,
 [`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md)
 for computing DER from draws.
 
-Other extraction:
+Other backends:
 [`extract_design()`](https://joonho112.github.io/svyder/reference/extract_design.md)
 
 ## Examples

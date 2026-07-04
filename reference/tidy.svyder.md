@@ -7,7 +7,8 @@ summaries, classification tier, and correction scale factor.
 ## Usage
 
 ``` r
-tidy.svyder(x, ...)
+# S3 method for class 'svyder'
+tidy(x, ...)
 ```
 
 ## Arguments
@@ -42,7 +43,7 @@ A `data.frame` with one row per parameter and columns:
 
 - tier:
 
-  Three-tier classification (if classified).
+  Design-sensitivity tier (if classified).
 
 - action:
 
@@ -55,7 +56,16 @@ A `data.frame` with one row per parameter and columns:
 
 - scale_factor:
 
-  Cholesky scale factor applied to this parameter.
+  Marginal SD ratio recorded for the correction. Under
+  `method = "block_cholesky"`, this is a reported marginal ratio, not a
+  per-parameter scalar transform.
+
+## References
+
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. *Journal of Survey Statistics and
+Methodology*. Submitted.
 
 ## See also
 
@@ -79,23 +89,23 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
-head(tidy.svyder(result))
+head(tidy(result))
 #>              term   estimate  std.error       der tier  action flagged
-#> beta[1]   beta[1]  0.2498445 0.14735061 0.2617696  I-b  retain   FALSE
-#> beta[2]   beta[2] -0.1494408 0.02604573 2.6868825  I-a CORRECT    TRUE
-#> beta[3]   beta[3]  0.1610078 0.20239837 0.3427294  I-b  retain   FALSE
-#> theta[1] theta[1] -0.2281087 0.40501395 3.3838218   II CORRECT    TRUE
-#> theta[2] theta[2]  0.7500209 0.42644395 0.6758803   II  retain   FALSE
-#> theta[3] theta[3]  1.0856688 0.43304778 1.1187639   II  retain   FALSE
+#> beta[1]   beta[1]  0.2498445 0.14735061 0.2626885  I-b  retain   FALSE
+#> beta[2]   beta[2] -0.1494408 0.02604573 2.6894416  I-a CORRECT    TRUE
+#> beta[3]   beta[3]  0.1610078 0.20239837 0.3430527  I-b  retain   FALSE
+#> theta[1] theta[1] -0.2281087 0.40501395 3.3858856   II CORRECT    TRUE
+#> theta[2] theta[2]  0.7500209 0.42644395 0.6759045   II  retain   FALSE
+#> theta[3] theta[3]  1.0856688 0.43304778 1.1182861   II  retain   FALSE
 #>          scale_factor
 #> beta[1]      1.000000
-#> beta[2]      1.639171
+#> beta[2]      1.639952
 #> beta[3]      1.000000
-#> theta[1]     1.839517
+#> theta[1]     1.840078
 #> theta[2]     1.000000
 #> theta[3]     1.000000
 ```

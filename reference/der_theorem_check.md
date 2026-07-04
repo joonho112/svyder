@@ -35,8 +35,18 @@ For random effects (Theorem 2):
 
 - DER \\\approx\\ B \\\cdot\\ DEFF \\\cdot\\ kappa(J).
 
-Also checks the conservation law (Corollary 5) when applicable: DER_mu +
-DER_theta_cond \\\approx\\ DEFF (balanced intercept-only case).
+Also reports the conservation-law diagnostic (Corollary 1) when
+applicable: DER_mu + DER_theta_cond \\\approx\\ DEFF (balanced
+intercept-only case). The conditional random-effect term is reported
+separately from the empirical marginal mean of the fitted random-effect
+DERs.
+
+## References
+
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. *Journal of Survey Statistics and
+Methodology*. Submitted.
 
 ## See also
 
@@ -56,19 +66,19 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
 thm <- der_theorem_check(result)
 head(thm)
 #>      param param_type der_empirical der_theorem1 der_theorem2 relative_error
-#> 1  beta[1] fe_between     0.2617696    0.3781171           NA     0.44446531
-#> 2  beta[2]  fe_within     2.6868825    2.5952698           NA     0.03409631
-#> 3  beta[3] fe_between     0.3427294    0.3781171           NA     0.10325253
-#> 4 theta[1]         re     3.3838218           NA     2.122360     0.37279206
-#> 5 theta[2]         re     0.6758803           NA     1.396910     1.06680154
-#> 6 theta[3]         re     1.1187639           NA     1.048017     0.06323640
+#> 1  beta[1] fe_between     0.2626885    0.3781171           NA     0.43941210
+#> 2  beta[2]  fe_within     2.6894416    2.5952698           NA     0.03501540
+#> 3  beta[3] fe_between     0.3430527    0.3781171           NA     0.10221260
+#> 4 theta[1]         re     3.3858856           NA     2.122360     0.37317436
+#> 5 theta[2]         re     0.6759045           NA     1.396910     1.06672753
+#> 6 theta[3]         re     1.1182861           NA     1.048017     0.06283619
 #>          theorem_used
 #> 1 Theorem 1 (between)
 #> 2  Theorem 1 (within)

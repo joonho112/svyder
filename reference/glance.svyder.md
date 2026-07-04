@@ -7,7 +7,8 @@ results.
 ## Usage
 
 ``` r
-glance.svyder(x, ...)
+# S3 method for class 'svyder'
+glance(x, ...)
 ```
 
 ## Arguments
@@ -68,6 +69,13 @@ A `data.frame` with one row and columns:
 
   Maximum DER value.
 
+## References
+
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. *Journal of Survey Statistics and
+Methodology*. Submitted.
+
 ## See also
 
 [`tidy.svyder()`](https://joonho112.github.io/svyder/reference/tidy.svyder.md)
@@ -88,13 +96,13 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
-glance.svyder(result)
+glance(result)
 #>   n_params n_flagged pct_flagged tau   family n_obs n_groups mean_deff
 #> 1       54        30    55.55556 1.2 binomial  6785       51   2.59527
 #>      mean_B   der_min  der_max
-#> 1 0.8543053 0.2349819 5.314837
+#> 1 0.8543053 0.2354213 5.307734
 ```

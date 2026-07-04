@@ -12,7 +12,13 @@ most users.
 ## Usage
 
 ``` r
-der_diagnose(x, ..., tau = 1.2, correct = TRUE)
+der_diagnose(
+  x,
+  ...,
+  tau = 1.2,
+  correct = TRUE,
+  method = c("block_cholesky", "marginal")
+)
 ```
 
 ## Arguments
@@ -35,10 +41,23 @@ der_diagnose(x, ..., tau = 1.2, correct = TRUE)
 
   Apply correction to flagged parameters (default `TRUE`).
 
+- method:
+
+  Correction method passed to
+  [`der_correct()`](https://joonho112.github.io/svyder/reference/der_correct.md)
+  (default `"block_cholesky"`).
+
 ## Value
 
 A fully processed `svyder` object with DER values, classification, and
 (optionally) corrected draws.
+
+## References
+
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. *Journal of Survey Statistics and
+Methodology*. Submitted.
 
 ## See also
 
@@ -64,88 +83,90 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
 print(result)
 #> svyder diagnostic (54 parameters)
 #>   Family: binomial | N = 6785 | J = 51
-#>   DER range: [0.235, 5.315]
+#>   Target: 644 cluster(s) | meat: centered, DF-corrected | weights: unit_mean
+#>   DER range: [0.235, 5.308]
+#>   Tier III (DER undefined): sigma_theta
 #>   Threshold (tau): 1.20
 #>   Flagged: 30 / 54 (55.6%)
 #> 
 #>   Flagged parameters:
-#>     beta[2]              DER = 2.687  [I-a] -> CORRECT
-#>     theta[1]             DER = 3.384  [II] -> CORRECT
-#>     theta[4]             DER = 2.212  [II] -> CORRECT
-#>     theta[5]             DER = 1.571  [II] -> CORRECT
-#>     theta[6]             DER = 2.103  [II] -> CORRECT
-#>     theta[7]             DER = 2.241  [II] -> CORRECT
-#>     theta[9]             DER = 5.315  [II] -> CORRECT
-#>     theta[11]            DER = 2.653  [II] -> CORRECT
-#>     theta[15]            DER = 1.573  [II] -> CORRECT
-#>     theta[18]            DER = 4.022  [II] -> CORRECT
+#>     beta[2]              DER = 2.689  [I-a] -> CORRECT
+#>     theta[1]             DER = 3.386  [II] -> CORRECT
+#>     theta[4]             DER = 2.210  [II] -> CORRECT
+#>     theta[5]             DER = 1.568  [II] -> CORRECT
+#>     theta[6]             DER = 2.104  [II] -> CORRECT
+#>     theta[7]             DER = 2.232  [II] -> CORRECT
+#>     theta[9]             DER = 5.308  [II] -> CORRECT
+#>     theta[11]            DER = 2.655  [II] -> CORRECT
+#>     theta[15]            DER = 1.576  [II] -> CORRECT
+#>     theta[18]            DER = 4.025  [II] -> CORRECT
 #>     ... and 20 more
 #> 
 #>   Correction applied: 30 parameter(s) rescaled
-#>   Compute time: 0.076 sec
+#>   Compute time: 0.019 sec
 summary(result)
 #>  param_name param_type       der tier                 tier_label flagged
-#>     beta[1] fe_between 0.2617696  I-b        Protected (between)   FALSE
-#>     beta[2]  fe_within 2.6868825  I-a           Survey-dominated    TRUE
-#>     beta[3] fe_between 0.3427294  I-b        Protected (between)   FALSE
-#>    theta[1]         re 3.3838218   II Protected (random effects)    TRUE
-#>    theta[2]         re 0.6758803   II Protected (random effects)   FALSE
-#>    theta[3]         re 1.1187639   II Protected (random effects)   FALSE
-#>    theta[4]         re 2.2120536   II Protected (random effects)    TRUE
-#>    theta[5]         re 1.5713900   II Protected (random effects)    TRUE
-#>    theta[6]         re 2.1027473   II Protected (random effects)    TRUE
-#>    theta[7]         re 2.2407594   II Protected (random effects)    TRUE
-#>    theta[8]         re 0.5988151   II Protected (random effects)   FALSE
-#>    theta[9]         re 5.3148375   II Protected (random effects)    TRUE
-#>   theta[10]         re 0.3234469   II Protected (random effects)   FALSE
-#>   theta[11]         re 2.6531533   II Protected (random effects)    TRUE
-#>   theta[12]         re 0.4991804   II Protected (random effects)   FALSE
-#>   theta[13]         re 0.2349819   II Protected (random effects)   FALSE
-#>   theta[14]         re 0.5524033   II Protected (random effects)   FALSE
-#>   theta[15]         re 1.5732575   II Protected (random effects)    TRUE
-#>   theta[16]         re 0.6809155   II Protected (random effects)   FALSE
-#>   theta[17]         re 0.8168582   II Protected (random effects)   FALSE
-#>   theta[18]         re 4.0217038   II Protected (random effects)    TRUE
-#>   theta[19]         re 1.9919767   II Protected (random effects)    TRUE
-#>   theta[20]         re 2.4774293   II Protected (random effects)    TRUE
-#>   theta[21]         re 1.7898408   II Protected (random effects)    TRUE
-#>   theta[22]         re 0.8740200   II Protected (random effects)   FALSE
-#>   theta[23]         re 1.3111319   II Protected (random effects)    TRUE
-#>   theta[24]         re 0.9736441   II Protected (random effects)   FALSE
-#>   theta[25]         re 0.7492859   II Protected (random effects)   FALSE
-#>   theta[26]         re 1.1561149   II Protected (random effects)   FALSE
-#>   theta[27]         re 2.3264034   II Protected (random effects)    TRUE
-#>   theta[28]         re 1.1845663   II Protected (random effects)   FALSE
-#>   theta[29]         re 1.6319237   II Protected (random effects)    TRUE
-#>   theta[30]         re 2.9722557   II Protected (random effects)    TRUE
-#>   theta[31]         re 1.2897827   II Protected (random effects)    TRUE
-#>   theta[32]         re 1.7132695   II Protected (random effects)    TRUE
-#>   theta[33]         re 0.7049967   II Protected (random effects)   FALSE
-#>   theta[34]         re 2.8424594   II Protected (random effects)    TRUE
-#>   theta[35]         re 1.2585246   II Protected (random effects)    TRUE
-#>   theta[36]         re 2.2770740   II Protected (random effects)    TRUE
-#>   theta[37]         re 0.7444208   II Protected (random effects)   FALSE
-#>   theta[38]         re 1.1215973   II Protected (random effects)   FALSE
-#>   theta[39]         re 2.2220272   II Protected (random effects)    TRUE
-#>   theta[40]         re 1.5670170   II Protected (random effects)    TRUE
-#>   theta[41]         re 1.8183090   II Protected (random effects)    TRUE
-#>   theta[42]         re 0.8853889   II Protected (random effects)   FALSE
-#>   theta[43]         re 2.2998027   II Protected (random effects)    TRUE
-#>   theta[44]         re 3.2334813   II Protected (random effects)    TRUE
-#>   theta[45]         re 1.5147483   II Protected (random effects)    TRUE
-#>   theta[46]         re 1.2276126   II Protected (random effects)    TRUE
-#>   theta[47]         re 2.1405640   II Protected (random effects)    TRUE
-#>   theta[48]         re 0.8888311   II Protected (random effects)   FALSE
-#>   theta[49]         re 0.7703205   II Protected (random effects)   FALSE
-#>   theta[50]         re 0.8947901   II Protected (random effects)   FALSE
-#>   theta[51]         re 0.7644108   II Protected (random effects)   FALSE
+#>     beta[1] fe_between 0.2626885  I-b        Protected (between)   FALSE
+#>     beta[2]  fe_within 2.6894416  I-a           Survey-dominated    TRUE
+#>     beta[3] fe_between 0.3430527  I-b        Protected (between)   FALSE
+#>    theta[1]         re 3.3858856   II Protected (random effects)    TRUE
+#>    theta[2]         re 0.6759045   II Protected (random effects)   FALSE
+#>    theta[3]         re 1.1182861   II Protected (random effects)   FALSE
+#>    theta[4]         re 2.2098098   II Protected (random effects)    TRUE
+#>    theta[5]         re 1.5677648   II Protected (random effects)    TRUE
+#>    theta[6]         re 2.1043742   II Protected (random effects)    TRUE
+#>    theta[7]         re 2.2322332   II Protected (random effects)    TRUE
+#>    theta[8]         re 0.5997084   II Protected (random effects)   FALSE
+#>    theta[9]         re 5.3077337   II Protected (random effects)    TRUE
+#>   theta[10]         re 0.3239584   II Protected (random effects)   FALSE
+#>   theta[11]         re 2.6550681   II Protected (random effects)    TRUE
+#>   theta[12]         re 0.5000038   II Protected (random effects)   FALSE
+#>   theta[13]         re 0.2354213   II Protected (random effects)   FALSE
+#>   theta[14]         re 0.5529524   II Protected (random effects)   FALSE
+#>   theta[15]         re 1.5756844   II Protected (random effects)    TRUE
+#>   theta[16]         re 0.6803656   II Protected (random effects)   FALSE
+#>   theta[17]         re 0.8177403   II Protected (random effects)   FALSE
+#>   theta[18]         re 4.0246235   II Protected (random effects)    TRUE
+#>   theta[19]         re 1.9922108   II Protected (random effects)    TRUE
+#>   theta[20]         re 2.4691218   II Protected (random effects)    TRUE
+#>   theta[21]         re 1.7903889   II Protected (random effects)    TRUE
+#>   theta[22]         re 0.8754189   II Protected (random effects)   FALSE
+#>   theta[23]         re 1.3105172   II Protected (random effects)    TRUE
+#>   theta[24]         re 0.9748128   II Protected (random effects)   FALSE
+#>   theta[25]         re 0.7496725   II Protected (random effects)   FALSE
+#>   theta[26]         re 1.1578875   II Protected (random effects)   FALSE
+#>   theta[27]         re 2.3241799   II Protected (random effects)    TRUE
+#>   theta[28]         re 1.1860962   II Protected (random effects)   FALSE
+#>   theta[29]         re 1.6306621   II Protected (random effects)    TRUE
+#>   theta[30]         re 2.9678609   II Protected (random effects)    TRUE
+#>   theta[31]         re 1.2876481   II Protected (random effects)    TRUE
+#>   theta[32]         re 1.7154958   II Protected (random effects)    TRUE
+#>   theta[33]         re 0.7052294   II Protected (random effects)   FALSE
+#>   theta[34]         re 2.8436195   II Protected (random effects)    TRUE
+#>   theta[35]         re 1.2581949   II Protected (random effects)    TRUE
+#>   theta[36]         re 2.2803658   II Protected (random effects)    TRUE
+#>   theta[37]         re 0.7436107   II Protected (random effects)   FALSE
+#>   theta[38]         re 1.1182233   II Protected (random effects)   FALSE
+#>   theta[39]         re 2.2223976   II Protected (random effects)    TRUE
+#>   theta[40]         re 1.5668657   II Protected (random effects)    TRUE
+#>   theta[41]         re 1.8209951   II Protected (random effects)    TRUE
+#>   theta[42]         re 0.8845594   II Protected (random effects)   FALSE
+#>   theta[43]         re 2.3013513   II Protected (random effects)    TRUE
+#>   theta[44]         re 3.2167380   II Protected (random effects)    TRUE
+#>   theta[45]         re 1.5048423   II Protected (random effects)    TRUE
+#>   theta[46]         re 1.2253161   II Protected (random effects)    TRUE
+#>   theta[47]         re 2.1341967   II Protected (random effects)    TRUE
+#>   theta[48]         re 0.8883745   II Protected (random effects)   FALSE
+#>   theta[49]         re 0.7717870   II Protected (random effects)   FALSE
+#>   theta[50]         re 0.8962989   II Protected (random effects)   FALSE
+#>   theta[51]         re 0.7652428   II Protected (random effects)   FALSE
 #>   action
 #>   retain
 #>  CORRECT

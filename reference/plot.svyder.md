@@ -51,6 +51,13 @@ is returned invisibly.
 If ggplot2 is installed, returns a ggplot object. Otherwise, falls back
 to base R graphics.
 
+## References
+
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. *Journal of Survey Statistics and
+Methodology*. Submitted.
+
 ## See also
 
 [`autoplot.svyder()`](https://joonho112.github.io/svyder/reference/autoplot.svyder.md)
@@ -67,7 +74,7 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )

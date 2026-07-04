@@ -1,0 +1,498 @@
+# Backends: brms, cmdstanr, rstanarm, and survey
+
+## Overview
+
+svyder computes Design Effect Ratios from a plain matrix of posterior
+draws. This vignette is for practitioners who have already fitted a
+hierarchical model with **brms**, **cmdstanr**, or **rstanarm**, and
+would rather hand svyder the fit object than reassemble the draws by
+hand. Two S3 generics do the wiring:
+[`extract_draws()`](https://joonho112.github.io/svyder/reference/extract_draws.md)
+pulls a standardized draws matrix out of a fit object or a
+`posterior::draws_*` container, and
+[`extract_design()`](https://joonho112.github.io/svyder/reference/extract_design.md)
+pulls survey weights, cluster ids, and strata out of a `survey` design
+object. The
+[`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md)
+methods for each backend call these generics for you.
+
+One theme runs through every backend: svyder can auto-detect a model’s
+likelihood and parameters, but it can **never** infer the survey design
+from a Stan fit — a `brmsfit` does not know which primary sampling units
+produced its rows. You therefore always pass `weights` and, most
+importantly, `cluster` yourself. And the plain-matrix path always works
+with no extra packages installed, so it is the reliable fallback
+whenever a backend is fussy.
+
+We cover, in order:
+
+- the matrix path (always available), which is exactly what the bundled
+  demo uses;
+- the three Stan front-ends — brms, cmdstanr, rstanarm — and what each
+  does and does not auto-extract;
+- the `survey` package via
+  [`extract_design()`](https://joonho112.github.io/svyder/reference/extract_design.md),
+  shown live on demo pieces;
+- `posterior` draws objects;
+- how to map your own model onto svyder’s `X`, `group`, and
+  `param_types`.
+
+> **Key insight.** No backend supplies `cluster`. The aggregation unit
+> is part of the *estimand* — the DER changes materially between a
+> design-PSU target and a model-group target — so svyder requires you to
+> declare it explicitly. This is a deliberate design decision, not a
+> limitation of any one backend.
+
+This vignette is about integration mechanics only. For the meaning of
+the DER, the four-tier classification, and the correction algorithm, see
+[Getting
+Started](https://joonho112.github.io/svyder/articles/getting-started.md)
+and [The Compute–Classify–Correct
+Pipeline](https://joonho112.github.io/svyder/articles/pipeline.md).
+
+## The matrix path (always available)
+
+Every
+[`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md)
+method eventually funnels into
+[`der_compute.matrix()`](https://joonho112.github.io/svyder/reference/der_compute.md),
+which takes a raw draws matrix (`S` samples \times `d` parameters,
+columns ordered `beta[1..p]` then `theta[1..J]`) plus the data and
+design pieces. The bundled `nsece_demo` object **is** the matrix path
+pre-assembled: it stores the draws alongside `y`, `X`, `group`,
+`weights`, `psu`, `family`, and `sigma_theta`, so no model fitting or
+Stan installation is required.
+
+Here is the canonical matrix call, run live on the demo. Note
+`cluster = nsece_demo$psu` — the design PSU ids — which is required and
+has no default:
+
+``` r
+
+fit <- der_compute(
+  nsece_demo$draws,                 # S x d draws matrix: [beta, theta]
+  y           = nsece_demo$y,
+  X           = nsece_demo$X,
+  group       = nsece_demo$group,
+  weights     = nsece_demo$weights,
+  cluster     = nsece_demo$psu,     # REQUIRED aggregation unit (design PSUs)
+  family      = nsece_demo$family,
+  sigma_theta = nsece_demo$sigma_theta,
+  param_types = nsece_demo$param_types
+)
+
+fit
+#> svyder diagnostic (54 parameters)
+#>   Family: binomial | N = 6785 | J = 51
+#>   Target: 644 cluster(s) | meat: centered, DF-corrected | weights: unit_mean
+#>   DER range: [0.235, 5.308]
+#>   Tier III (DER undefined): sigma_theta
+#>   (not yet classified -- run der_classify())
+#>   Compute time: 0.022 sec
+```
+
+That is the whole contract for the matrix path: **you supply
+everything**. The backend methods below exist only to fill in as many of
+these arguments as can be recovered from a fit object, so you type less.
+What they can recover differs by backend, but `weights` and `cluster`
+are never among them.
+
+> **Note.** If you can produce a draws matrix in `[beta, theta]` column
+> order — from any sampler, including one svyder has no method for — you
+> never need a backend at all. Pass the matrix directly, as above.
+
+## brms
+
+[`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md)
+has a method for `brmsfit` objects. Because brms stores the full model
+specification (data, formula, family, priors) inside the fit, this
+method auto-extracts almost everything. Concretely,
+[`der_compute.brmsfit()`](https://joonho112.github.io/svyder/reference/der_compute.md):
+
+- reads the **response** `y` and **design matrix** `X` from the stored
+  model data and
+  [`brms::standata()`](https://paulbuerkner.com/brms/reference/standata.html);
+- infers **`family`** from
+  [`stats::family()`](https://rdrr.io/r/stats/family.html) (brms
+  `bernoulli`/`binomial` \rightarrow `"binomial"`, `gaussian`
+  \rightarrow `"gaussian"`);
+- detects the **`group`** factor from the first random-effect grouping
+  term;
+- estimates **`sigma_theta`** as the posterior mean of the first `sd_*`
+  parameter (and `sigma_e` from `sigma`, for gaussian);
+- extracts the **draws** via
+  [`extract_draws.brmsfit()`](https://joonho112.github.io/svyder/reference/extract_draws.md),
+  which keeps population-level (`b_*`) and group-level (`r_*`)
+  parameters, drops variance and correlation components (`sd_*`,
+  `cor_*`, `sigma`, `lp__`, `lprior`), and renames them to svyder’s
+  `beta[k]` / `theta[j]` convention.
+
+What you must still pass: **`weights`** (survey weights) and
+**`cluster`** (the aggregation unit) — brms fit objects carry no survey
+design. You may also pass `group` to override the auto-detected grouping
+factor, or `sigma_theta` / `family` to override the auto-detected
+values.
+
+The following is illustrative and not evaluated here (it requires a
+compiled Stan model):
+
+``` r
+
+library(brms)
+
+# A hierarchical logistic model fitted to survey data
+bfit <- brm(
+  y ~ poverty_cwc + tiered_reim + (1 | state),
+  data   = provider_df,
+  family = bernoulli()
+)
+
+# svyder auto-extracts y, X, group, family, sigma_theta from bfit;
+# you supply the survey weights and the cluster aggregation unit.
+der <- der_compute(
+  bfit,
+  weights = provider_df$w,          # survey weights (NOT in the fit)
+  cluster = provider_df$psu         # REQUIRED: design PSU ids
+)
+
+der_diagnose(der)                   # classify + correct in one step
+```
+
+> **Key insight.** brms auto-detection is a convenience, not magic. It
+> reads the *model*, never the *sample design*. If your PSUs are not the
+> same as your model grouping factor, be deliberate:
+> `cluster = provider_df$psu` gives a design-based target,
+> `cluster = provider_df$state` gives a model-aligned one.
+
+## cmdstanr
+
+The `CmdStanMCMC` method is the most manual of the three, because
+CmdStan keeps **no model data** in the fit object — only the draws.
+[`extract_draws.CmdStanMCMC()`](https://joonho112.github.io/svyder/reference/extract_draws.md)
+converts `fit$draws()` to a matrix and strips the diagnostic columns
+`lp__` and `lp_approx__`; that is all cmdstanr can give svyder
+automatically.
+
+Consequently
+[`der_compute.CmdStanMCMC()`](https://joonho112.github.io/svyder/reference/der_compute.md)
+requires you to supply **every** data argument yourself: `y`, `X`,
+`group`, `weights`, `cluster`, and `sigma_theta` (plus `sigma_e` for
+gaussian, and optional `strata`, `normalize`, `param_types`). Crucially,
+the draws matrix you fitted **must already be in svyder column order**,
+`[beta_1, ..., beta_p, theta_1, ..., theta_J]`, because svyder cannot
+reorder columns it cannot name.
+
+Not evaluated (requires CmdStan):
+
+``` r
+
+library(cmdstanr)
+
+mod <- cmdstan_model("hierarchical_logit.stan")
+cfit <- mod$sample(data = stan_data, parallel_chains = 4)
+
+# cmdstanr stores no data, so supply ALL pieces explicitly.
+der <- der_compute(
+  cfit,
+  y           = stan_data$y,
+  X           = stan_data$X,            # columns match beta[1..p]
+  group       = stan_data$group,
+  weights     = stan_data$w,            # survey weights
+  cluster     = stan_data$psu,          # REQUIRED aggregation unit
+  family      = "binomial",
+  sigma_theta = 0.66                    # or a posterior summary of your sd param
+)
+```
+
+> **Note.** With cmdstanr the burden of getting `X` and the draw columns
+> into the same order as `beta[1..p]` is on you. If in doubt, extract
+> the draws yourself, reorder to `[beta, theta]`, and use the matrix
+> path — it is identical in result and easier to verify.
+
+## rstanarm
+
+The `stanreg` method sits between brms and cmdstanr in convenience.
+rstanarm stores the data, formula, and family, so
+[`der_compute.stanreg()`](https://joonho112.github.io/svyder/reference/der_compute.md)
+auto-extracts:
+
+- **`y`** from `x$y` and **`X`** from `stats::model.matrix(x)`;
+- **`family`** from
+  [`stats::family()`](https://rdrr.io/r/stats/family.html) (`binomial`
+  or `gaussian`);
+- the **`group`** factor from `x$glmod$reTrms$flist` (the first grouping
+  term);
+- **`sigma_theta`** as `sqrt(mean(.))` of the first `Sigma[...]`
+  variance component (rstanarm stores group-level *variances*, so svyder
+  takes the square root), and **`sigma_e`** from `sigma` for gaussian;
+- the **draws** via
+  [`extract_draws.stanreg()`](https://joonho112.github.io/svyder/reference/extract_draws.md),
+  which keeps fixed effects (plain names such as `(Intercept)`, `x1`)
+  and random effects (`b[...]`), drops `Sigma[...]`, `sigma`, and
+  `log-posterior`, and renames to `beta[k]` / `theta[j]`.
+
+As always, you provide **`weights`** and **`cluster`** yourself.
+
+Not evaluated (requires a compiled Stan model):
+
+``` r
+
+library(rstanarm)
+
+sfit <- stan_glmer(
+  y ~ poverty_cwc + tiered_reim + (1 | state),
+  data   = provider_df,
+  family = binomial()
+)
+
+# rstanarm auto-extracts y, X, group, family, sigma_theta (and sigma_e);
+# you supply weights and the cluster aggregation unit.
+der <- der_compute(
+  sfit,
+  weights = provider_df$w,
+  cluster = provider_df$psu           # REQUIRED
+)
+```
+
+## The survey package
+
+The `survey` package is the natural source of the two things every Stan
+backend lacks: survey **weights** and the **cluster** (PSU) aggregation
+unit.
+[`extract_design()`](https://joonho112.github.io/svyder/reference/extract_design.md)
+has a method for `survey.design2` objects that returns exactly those
+pieces — plus strata — ready to hand to
+[`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md).
+
+Because the `survey` package is available here, we can demonstrate this
+**live**. We build a minimal single-stage design from `nsece_demo`
+pieces: a data frame holding the PSU id and the weight, wrapped by
+[`survey::svydesign()`](https://rdrr.io/pkg/survey/man/svydesign.html).
+(In a real analysis this is the design object you already have; we
+reconstruct a small one purely so the example runs without external
+data.)
+
+``` r
+
+library(survey)
+
+# A data frame carrying the two design columns svyder needs
+df_des <- data.frame(
+  psu = nsece_demo$psu,
+  w   = nsece_demo$weights
+)
+
+des <- svydesign(ids = ~psu, weights = ~w, data = df_des)
+class(des)
+#> [1] "survey.design2" "survey.design"
+```
+
+Now call
+[`extract_design()`](https://joonho112.github.io/svyder/reference/extract_design.md)
+on it and inspect what comes back:
+
+``` r
+
+di <- extract_design(des)
+
+str(di, max.level = 1)
+#> List of 3
+#>  $ weights: Named num [1:6785] 0.327 6.848 0.269 0.272 0.937 ...
+#>   ..- attr(*, "names")= chr [1:6785] "1" "2" "3" "4" ...
+#>  $ cluster: num [1:6785] 1 1 1 1 1 1 1 1 1 1 ...
+#>  $ strata :'data.frame': 6785 obs. of  1 variable:
+```
+
+[`extract_design.survey.design2()`](https://joonho112.github.io/svyder/reference/extract_design.md)
+returns a three-element list:
+
+- **`weights`** — the survey weights (`stats::weights(des)`), one per
+  row;
+- **`cluster`** — the PSU identifiers from the first stage
+  (`des$cluster[[1]]`); svyder later coerces these to consecutive
+  integer ids;
+- **`strata`** — a data frame of stratum variables, or (for this
+  unstratified design) a single column of constant values.
+
+``` r
+
+cat(sprintf("weights: %d values, mean %.3f\n",
+            length(di$weights), mean(di$weights)))
+#> weights: 6785 values, mean 1.000
+cat(sprintf("cluster: %d unique PSUs\n", length(unique(di$cluster))))
+#> cluster: 644 unique PSUs
+cat(sprintf("strata : %d column(s)\n", ncol(di$strata)))
+#> strata : 1 column(s)
+```
+
+That gives 644 unique PSUs — exactly the design-based aggregation unit
+for `nsece_demo`. You could stop here and pass `di$weights` and
+`di$cluster` into the matrix call by hand. But
+[`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md)
+accepts the design object directly through its `design =` argument and
+does the extraction internally, which is the tidiest route. This runs
+**live** on the demo draws:
+
+``` r
+
+fit_des <- der_compute(
+  nsece_demo$draws,
+  y           = nsece_demo$y,
+  X           = nsece_demo$X,
+  group       = nsece_demo$group,
+  family      = nsece_demo$family,
+  sigma_theta = nsece_demo$sigma_theta,
+  param_types = nsece_demo$param_types,
+  design      = des                   # supplies weights + cluster + strata
+)
+
+# The three fixed-effect DERs, recovered via the survey design object
+round(fit_des$der[1:3], 3)
+#> beta[1] beta[2] beta[3] 
+#>   0.263   2.689   0.343
+```
+
+These are the design-based DERs for the three fixed effects: the
+intercept and tiered-reimbursement coefficients (both between-state) sit
+well below 1, while `beta[2]`, the within-state poverty coefficient, is
+flagged. Passing `design = des` reproduces the same fixed-effect DERs as
+passing `cluster = nsece_demo$psu` explicitly, because the design’s PSUs
+*are* those cluster ids — the design object is simply a convenient
+carrier for them.
+
+What the design records is stored in `fit_des$target`:
+
+``` r
+
+fit_des$target[c("cluster_n", "strata_n", "normalize")]
+#> $cluster_n
+#> [1] 644
+#> 
+#> $strata_n
+#> [1] 1
+#> 
+#> $normalize
+#> [1] "unit_mean"
+```
+
+> **Note.** When a `survey.design2` carries genuine strata (more than
+> one stratum),
+> [`der_compute()`](https://joonho112.github.io/svyder/reference/der_compute.md)
+> picks them up automatically and switches the meat estimator to its
+> stratified form. `nsece_demo` has no strata, so `strata_n` is 1 here
+> and the estimator is unstratified. Weights still follow the
+> `normalize` convention (`"unit_mean"` by default), recorded alongside
+> the cluster count.
+
+## Posterior draws objects
+
+If you already hold your draws as a `posterior` package object, you do
+not need a model-specific backend at all.
+[`extract_draws()`](https://joonho112.github.io/svyder/reference/extract_draws.md)
+has methods for every `posterior::draws_*` format — `draws_matrix`,
+`draws_df`, `draws_array`, `draws_list`, and `draws_rvars` — each of
+which converts to a plain matrix and drops the `.chain`, `.iteration`,
+and `.draw` bookkeeping columns. The `matrix` method is the identity: a
+matrix is already draws.
+
+``` r
+
+library(posterior)
+
+# Suppose you assembled your draws as a posterior draws_matrix,
+# with columns already ordered [beta[1..p], theta[1..J]].
+dm <- as_draws_matrix(my_draws)
+
+der <- der_compute(
+  as.matrix(dm),                      # or feed dm through extract_draws()
+  y = y, X = X, group = group,
+  weights = w, cluster = psu,         # REQUIRED
+  family = "binomial", sigma_theta = 0.66
+)
+```
+
+Because these methods only reshape draws, they carry the same
+requirement as the matrix path: the columns must be in svyder order, and
+you still supply all the data and design arguments, `cluster` included.
+
+## Mapping your model to X / group / param_types
+
+Whichever backend you use, svyder ultimately needs three model-structure
+inputs lined up correctly. Getting them right matters more than which
+front-end produced the fit.
+
+**`X` — the fixed-effect design matrix.** Its columns must correspond,
+in order, to the `beta[1..p]` draws. brms and rstanarm build `X` for you
+from the formula; with cmdstanr or the matrix path you pass it yourself
+and are responsible for the column ordering.
+
+**`group` — the grouping factor.** An integer (or coercible) vector, one
+value per observation, giving each row’s group. It defines the
+`theta[1..J]` random effects and the shrinkage structure. brms and
+rstanarm read it from the first random-effect term; cmdstanr and the
+matrix path take it directly.
+
+**`param_types` — how each fixed effect is identified.** A character
+vector, one entry per column of `X`, taking values `"fe_within"` or
+`"fe_between"`:
+
+- `"fe_within"` — the covariate varies **within** groups (e.g. an
+  individual-level poverty measure). Under Theorem 1 its DER equals the
+  full design effect (Tier I-a) and it is the primary correction
+  candidate.
+- `"fe_between"` — the covariate is **constant within** each group
+  (e.g. a state-level policy indicator). Its DER is \mathrm{DEFF}\\(1 -
+  B), shielded by shrinkage (Tier I-b), and it is usually below the
+  threshold.
+
+If you leave `param_types = NULL`, svyder infers it from `X` — any
+column that is constant within every group is labelled `fe_between`, the
+rest `fe_within` — and emits a message so you can check the inference,
+for example:
+
+    param_types inferred from the design matrix: intercept=fe_between,
+    poverty_cwc=fe_within, tiered_reim=fe_between. Supply 'param_types' to override.
+
+Passing `param_types` explicitly suppresses the message. Inference is
+reliable for the demo, but a within-group covariate that happens to be
+constant within every realized group in *your* sample would be
+mislabelled `fe_between`; when in doubt, state `param_types` yourself.
+In `nsece_demo` the mapping is:
+
+``` r
+
+data.frame(
+  column     = colnames(nsece_demo$X),
+  param_type = nsece_demo$param_types
+)
+#>        column param_type
+#> 1   intercept fe_between
+#> 2 poverty_cwc  fe_within
+#> 3 tiered_reim fe_between
+```
+
+> **Key insight.** `param_types` is about the covariate’s *variation
+> structure*, not about statistical significance or effect size. A
+> within-group covariate is “survey-exposed” because clustered sampling
+> directly inflates the variance of the contrasts that identify it; a
+> between-group covariate is shielded because hierarchical shrinkage
+> absorbs part of the design effect. This is the crux of the whole
+> diagnostic, and it is set here, at the mapping step.
+
+## What’s next?
+
+You can now feed svyder from any of its supported backends, or bypass
+them with a plain draws matrix. The natural next steps:
+
+| Vignette | What you will learn |
+|:---|:---|
+| [Getting Started](https://joonho112.github.io/svyder/articles/getting-started.md) | The full diagnostic in one call, read from `print`, `tidy`, `glance`, and one profile plot. |
+| [The Compute–Classify–Correct Pipeline](https://joonho112.github.io/svyder/articles/pipeline.md) | Step through `der_compute` \rightarrow `der_classify` \rightarrow `der_correct`, tune the threshold, and see why selective correction beats blanket correction. |
+
+For the design-target decision that the `cluster =` argument encodes —
+design PSUs versus model groups, weight conventions, and strata — see
+[`vignette("choosing-the-target")`](https://joonho112.github.io/svyder/articles/choosing-the-target.md).
+For the theory behind `param_types` and the four tiers, see
+[`vignette("theory-decomposition")`](https://joonho112.github.io/svyder/articles/theory-decomposition.md)
+and
+[`vignette("theory-sandwich")`](https://joonho112.github.io/svyder/articles/theory-sandwich.md).
