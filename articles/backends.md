@@ -88,7 +88,7 @@ fit
 #>   DER range: [0.235, 5.308]
 #>   Tier III (DER undefined): sigma_theta
 #>   (not yet classified -- run der_classify())
-#>   Compute time: 0.022 sec
+#>   Compute time: 0.072 sec
 ```
 
 That is the whole contract for the matrix path: **you supply

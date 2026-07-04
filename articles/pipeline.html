@@ -42,7 +42,7 @@
       <ul class="navbar-nav me-auto">
 <li class="nav-item"><a class="nav-link" href="../articles/getting-started.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
-<li class="nav-item dropdown">
+<li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><h6 class="dropdown-header" data-toc-skip>--- Applied track ---</h6></li>
@@ -82,7 +82,7 @@
             
             <h4 data-toc-skip class="date">2026-07-04</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/joonho112/svyder/blob/HEAD/vignettes/pipeline.Rmd" class="external-link"><code>vignettes/pipeline.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/joonho112/svyder/blob/main/vignettes/pipeline.Rmd" class="external-link"><code>vignettes/pipeline.Rmd</code></a></small>
       <div class="d-none name"><code>pipeline.Rmd</code></div>
     </div>
 
@@ -216,7 +216,7 @@ diagnostic summary:</p>
 <span><span class="co">#&gt;   DER range: [0.235, 5.308]</span></span>
 <span><span class="co">#&gt;   Tier III (DER undefined): sigma_theta</span></span>
 <span><span class="co">#&gt;   (not yet classified -- run der_classify())</span></span>
-<span><span class="co">#&gt;   Compute time: 0.022 sec</span></span></code></pre></div>
+<span><span class="co">#&gt;   Compute time: 0.076 sec</span></span></code></pre></div>
 <p>Read the header line by line. The <strong>Target</strong> describes
 the declared variance target: 644 clusters, a meat matrix that is
 centered and degrees-of-freedom corrected (the v2 defaults), and
@@ -350,7 +350,7 @@ classification print shows the flagged set:</p>
 <span><span class="co">#&gt;     theta[15]            DER = 1.576  [II] -&gt; CORRECT</span></span>
 <span><span class="co">#&gt;     theta[18]            DER = 4.025  [II] -&gt; CORRECT</span></span>
 <span><span class="co">#&gt;     ... and 20 more</span></span>
-<span><span class="co">#&gt;   Compute time: 0.022 sec</span></span></code></pre></div>
+<span><span class="co">#&gt;   Compute time: 0.076 sec</span></span></code></pre></div>
 <p>You can also work with the classification table directly. Here is the
 flagged subset:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
@@ -410,7 +410,7 @@ Algorithm 1:</p>
 <span><span class="co">#&gt;     ... and 20 more</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;   Correction applied: 30 parameter(s) rescaled</span></span>
-<span><span class="co">#&gt;   Compute time: 0.022 sec</span></span></code></pre></div>
+<span><span class="co">#&gt;   Compute time: 0.076 sec</span></span></code></pre></div>
 <p>The two methods differ in how they treat the <em>joint</em> structure
 of the flagged block:</p>
 <ul>

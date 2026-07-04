@@ -164,7 +164,7 @@ cls_psu
 #>     theta[15]            DER = 1.576  [II] -> CORRECT
 #>     theta[18]            DER = 4.025  [II] -> CORRECT
 #>     ... and 20 more
-#>   Compute time: 0.022 sec
+#>   Compute time: 0.073 sec
 ```
 
 Under the **design-PSU target** the DER range is \[0.235,\\ 5.308\] and
@@ -203,7 +203,7 @@ cls_group
 #>     theta[11]            DER = 2.061  [II] -> CORRECT
 #>     theta[18]            DER = 3.222  [II] -> CORRECT
 #>     ... and 15 more
-#>   Compute time: 0.006 sec
+#>   Compute time: 0.024 sec
 ```
 
 Under the **model-group target** the DER range widens to \[0.058,\\
@@ -426,9 +426,9 @@ der_no <- der_at("none")
 
 # The three DER vectors are identical up to floating-point noise on this demo.
 max(abs(der_um - der_gs))
-#> [1] 2.720046e-14
+#> [1] 1.565414e-14
 max(abs(der_um - der_no))
-#> [1] 3.752554e-14
+#> [1] 3.252953e-14
 ```
 
 The differences are at the level of machine precision, so we cannot use

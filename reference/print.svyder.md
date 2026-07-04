@@ -89,5 +89,5 @@ print(result)
 #>     ... and 20 more
 #> 
 #>   Correction applied: 30 parameter(s) rescaled
-#>   Compute time: 0.018 sec
+#>   Compute time: 0.056 sec
 ```

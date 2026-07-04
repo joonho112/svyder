@@ -151,7 +151,7 @@ print(result)
 #>     ... and 20 more
 #> 
 #>   Correction applied: 30 parameter(s) rescaled
-#>   Compute time: 0.022 sec
+#>   Compute time: 0.073 sec
 ```
 
 Read this top to bottom:

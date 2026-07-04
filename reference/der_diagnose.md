@@ -110,7 +110,7 @@ print(result)
 #>     ... and 20 more
 #> 
 #>   Correction applied: 30 parameter(s) rescaled
-#>   Compute time: 0.019 sec
+#>   Compute time: 0.057 sec
 summary(result)
 #>  param_name param_type       der tier                 tier_label flagged
 #>     beta[1] fe_between 0.2626885  I-b        Protected (between)   FALSE

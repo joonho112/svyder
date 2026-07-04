@@ -307,7 +307,7 @@ result
 #>     ... and 20 more
 #> 
 #>   Correction applied: 30 parameter(s) rescaled
-#>   Compute time: 0.024 sec
+#>   Compute time: 0.064 sec
 ```
 
 Read it top to bottom: the target is 644 clusters with a centred,

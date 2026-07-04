@@ -120,7 +120,7 @@ result
 #>   DER range: [0.235, 5.308]
 #>   Tier III (DER undefined): sigma_theta
 #>   (not yet classified -- run der_classify())
-#>   Compute time: 0.022 sec
+#>   Compute time: 0.076 sec
 ```
 
 Read the header line by line. The **Target** describes the declared
@@ -259,7 +259,7 @@ result
 #>     theta[15]            DER = 1.576  [II] -> CORRECT
 #>     theta[18]            DER = 4.025  [II] -> CORRECT
 #>     ... and 20 more
-#>   Compute time: 0.022 sec
+#>   Compute time: 0.076 sec
 ```
 
 You can also work with the classification table directly. Here is the
@@ -325,7 +325,7 @@ result
 #>     ... and 20 more
 #> 
 #>   Correction applied: 30 parameter(s) rescaled
-#>   Compute time: 0.022 sec
+#>   Compute time: 0.076 sec
 ```
 
 The two methods differ in how they treat the *joint* structure of the

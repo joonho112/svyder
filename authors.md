@@ -8,7 +8,7 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/joonho112/svyder/blob/HEAD/inst/CITATION)
+[`inst/CITATION`](https://github.com/joonho112/svyder/blob/main/inst/CITATION)
 
 Lee J, Williams M, Savitsky T (2026). “Design Effect Ratios for Bayesian
 Survey Models: A Diagnostic Framework for Identifying Survey-Sensitive
