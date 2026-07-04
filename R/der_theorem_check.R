@@ -23,8 +23,10 @@
 #'   \item DER \eqn{\approx}{~} B \eqn{\cdot}{*} DEFF \eqn{\cdot}{*} kappa(J).
 #' }
 #'
-#' Also checks the conservation law (Corollary 5) when applicable:
+#' Also reports the conservation-law diagnostic (Corollary 1) when applicable:
 #' DER_mu + DER_theta_cond \eqn{\approx}{~} DEFF (balanced intercept-only case).
+#' The conditional random-effect term is reported separately from the empirical
+#' marginal mean of the fitted random-effect DERs.
 #'
 #' @param x A \code{svyder} object.
 #'
@@ -32,6 +34,12 @@
 #'   \code{der_empirical}, \code{der_theorem1} (for FE), \code{der_theorem2}
 #'   (for RE), \code{relative_error}, \code{theorem_used}. If the conservation
 #'   law is applicable, the result has a \code{"conservation_law"} attribute.
+#'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
 #'
 #' @seealso [der_decompose()] for the full decomposition.
 #' @family analysis
@@ -42,7 +50,7 @@
 #'   nsece_demo$draws,
 #'   y = nsece_demo$y, X = nsece_demo$X,
 #'   group = nsece_demo$group, weights = nsece_demo$weights,
-#'   psu = nsece_demo$psu, family = "binomial",
+#'   cluster = nsece_demo$psu, family = "binomial",
 #'   sigma_theta = nsece_demo$sigma_theta,
 #'   param_types = nsece_demo$param_types
 #' )
@@ -101,10 +109,7 @@ der_theorem_check <- function(x) {
 
     } else {
       # Theorem 2 (RE): DER ~ B * DEFF * kappa(J)
-      # Use per-group values for the j-th random effect
-      j_idx <- i - sum(param_types[seq_len(i)] != "re") + sum(param_types == "re" & seq_along(param_types) <= i) - sum(param_types[seq_len(i)] == "re") + 1L
-
-      # Simpler approach: random effects are at positions after all FE
+      # Random effects occupy the positions after all fixed effects
       n_fe <- sum(param_types != "re")
       j_idx <- i - n_fe
 
@@ -140,7 +145,7 @@ der_theorem_check <- function(x) {
     stringsAsFactors = FALSE
   )
 
-  # --- Conservation law check (Corollary 5) ---
+  # --- Conservation law check (Corollary 1) ---
   # DER_mu + DER_theta_cond ~ DEFF
 
   # Only applicable when there is an intercept (fe_between) and RE
@@ -152,19 +157,21 @@ der_theorem_check <- function(x) {
     idx_between <- which(param_types == "fe_between")[1]
     der_mu      <- der[idx_between]
 
-    # Mean DER of random effects as proxy for conditional DER
     idx_re      <- which(param_types == "re")
-    der_theta_mean <- mean(der[idx_re])
+    der_theta_cond <- mean(B_j * deff_j)
+    der_theta_marginal_mean <- mean(der[idx_re])
 
-    conservation_sum   <- der_mu + der_theta_mean
+    conservation_sum   <- der_mu + der_theta_cond
     conservation_error <- abs(conservation_sum - deff_mean) / deff_mean
 
     attr(result, "conservation_law") <- list(
-      der_mu             = der_mu,
-      der_theta_mean     = der_theta_mean,
-      conservation_sum   = conservation_sum,
-      deff_mean          = deff_mean,
-      relative_error     = conservation_error
+      der_mu                  = der_mu,
+      der_theta_cond          = der_theta_cond,
+      der_theta_marginal_mean = der_theta_marginal_mean,
+      der_theta_mean          = der_theta_marginal_mean,
+      conservation_sum        = conservation_sum,
+      deff_mean               = deff_mean,
+      relative_error          = conservation_error
     )
   }
 

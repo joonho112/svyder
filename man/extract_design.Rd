@@ -31,11 +31,21 @@ Extracts weights, cluster identifiers, and strata from survey design
 objects created by the \pkg{survey} package. The extracted information
 can be passed directly to \code{\link[=der_compute]{der_compute()}}.
 }
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
+
+Rabe-Hesketh, S., & Skrondal, A. (2006). Multilevel modelling of complex
+survey data. \emph{Journal of the Royal Statistical Society: Series A},
+169(4), 805--827. \doi{10.1111/j.1467-985X.2006.00426.x}
+}
 \seealso{
 \code{\link[=extract_draws]{extract_draws()}} for extracting posterior draws,
 \code{\link[=der_compute]{der_compute()}} for computing DER.
 
-Other extraction: 
-\code{\link{extract_draws.brmsfit}()}
+Other backends:
+\code{\link[=extract_draws.brmsfit]{extract_draws.brmsfit()}}
 }
-\concept{extraction}
+\concept{backends}

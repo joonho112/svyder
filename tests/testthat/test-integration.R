@@ -9,7 +9,7 @@ test_that("full pipeline on nsece_demo data", {
     nsece_demo$draws,
     y = nsece_demo$y, X = nsece_demo$X,
     group = nsece_demo$group, weights = nsece_demo$weights,
-    psu = nsece_demo$psu, family = nsece_demo$family,
+    cluster = nsece_demo$psu, family = nsece_demo$family,
     sigma_theta = nsece_demo$sigma_theta,
     param_types = nsece_demo$param_types
   )
@@ -23,6 +23,7 @@ test_that("full pipeline on sim_hlr data", {
     sim_hlr$draws,
     y = sim_hlr$y, X = sim_hlr$X,
     group = sim_hlr$group, weights = sim_hlr$weights,
+    cluster = sim_hlr$psu,
     family = sim_hlr$family,
     sigma_theta = sim_hlr$sigma_theta,
     sigma_e = sim_hlr$sigma_e,
@@ -36,7 +37,7 @@ test_that("pipe chain works end-to-end", {
   result <- nsece_demo$draws |>
     der_compute(y = nsece_demo$y, X = nsece_demo$X,
                 group = nsece_demo$group, weights = nsece_demo$weights,
-                psu = nsece_demo$psu, family = "binomial",
+                cluster = nsece_demo$psu, family = "binomial",
                 sigma_theta = nsece_demo$sigma_theta,
                 param_types = nsece_demo$param_types) |>
     der_classify(tau = 1.2, verbose = FALSE) |>
@@ -75,6 +76,7 @@ test_that("sim_hlr equal weights produce DER near 1", {
     sim_hlr$draws,
     y = sim_hlr$y, X = sim_hlr$X,
     group = sim_hlr$group, weights = sim_hlr$weights,
+    cluster = sim_hlr$psu,
     family = sim_hlr$family,
     sigma_theta = sim_hlr$sigma_theta,
     sigma_e = sim_hlr$sigma_e,
@@ -96,7 +98,7 @@ test_that("nsece_demo produces flagged fe_between parameters", {
     nsece_demo$draws,
     y = nsece_demo$y, X = nsece_demo$X,
     group = nsece_demo$group, weights = nsece_demo$weights,
-    psu = nsece_demo$psu, family = nsece_demo$family,
+    cluster = nsece_demo$psu, family = nsece_demo$family,
     sigma_theta = nsece_demo$sigma_theta,
     param_types = nsece_demo$param_types
   )
@@ -113,7 +115,7 @@ test_that("corrected draws preserve posterior mean", {
     nsece_demo$draws,
     y = nsece_demo$y, X = nsece_demo$X,
     group = nsece_demo$group, weights = nsece_demo$weights,
-    psu = nsece_demo$psu, family = nsece_demo$family,
+    cluster = nsece_demo$psu, family = nsece_demo$family,
     sigma_theta = nsece_demo$sigma_theta,
     param_types = nsece_demo$param_types
   )

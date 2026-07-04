@@ -32,8 +32,10 @@ For random effects (Theorem 2):
 \item DER \eqn{\approx}{~} B \eqn{\cdot}{*} DEFF \eqn{\cdot}{*} kappa(J).
 }
 
-Also checks the conservation law (Corollary 5) when applicable:
+Also reports the conservation-law diagnostic (Corollary 1) when applicable:
 DER_mu + DER_theta_cond \eqn{\approx}{~} DEFF (balanced intercept-only case).
+The conditional random-effect term is reported separately from the empirical
+marginal mean of the fitted random-effect DERs.
 }
 \examples{
 data(nsece_demo)
@@ -41,7 +43,7 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
@@ -49,12 +51,18 @@ thm <- der_theorem_check(result)
 head(thm)
 
 }
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
+}
 \seealso{
 \code{\link[=der_decompose]{der_decompose()}} for the full decomposition.
 
-Other analysis: 
-\code{\link{der_compare}()},
-\code{\link{der_decompose}()},
-\code{\link{der_sensitivity}()}
+Other analysis:
+\code{\link[=der_compare]{der_compare()}},
+\code{\link[=der_decompose]{der_decompose()}},
+\code{\link[=der_sensitivity]{der_sensitivity()}}
 }
 \concept{analysis}

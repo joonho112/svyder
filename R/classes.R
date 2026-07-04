@@ -22,13 +22,20 @@
 #' @param classification Data frame with per-parameter classification results.
 #' @param tau Numeric scalar, flagging threshold for DER.
 #' @param corrected_draws Numeric matrix, corrected posterior draws (M x d).
-#' @param scale_factors Numeric vector of Cholesky scale factors (length d).
+#' @param scale_factors Numeric vector of marginal SD ratios recorded for
+#'   correction reporting (length d).
 #' @param original_draws Numeric matrix, original posterior draws (M x d).
 #' @param call The matched call that produced this object.
 #' @param family Character string, model family (e.g., "binomial", "gaussian").
 #' @param n_obs Integer, number of observations.
 #' @param n_groups Integer, number of groups/clusters.
 #' @param compute_time Numeric scalar, computation time in seconds.
+#' @param target List describing the declared variance target (aggregation
+#'   unit, strata, meat options, weight convention, bread convention).
+#' @param excluded Data frame of Tier III parameters excluded from the DER
+#'   diagnostic (hyperparameters), with reasons.
+#' @param data List of data slots retained for re-targeting and structural
+#'   decomposition (X, group, weights, cluster, strata, v, r).
 #'
 #' @return A list of class \code{"svyder"}.
 #'
@@ -50,7 +57,10 @@ new_svyder <- function(der,
                        family,
                        n_obs,
                        n_groups,
-                       compute_time) {
+                       compute_time,
+                       target = NULL,
+                       excluded = NULL,
+                       data = NULL) {
 
   structure(
     list(
@@ -71,7 +81,10 @@ new_svyder <- function(der,
       family           = family,
       n_obs            = n_obs,
       n_groups         = n_groups,
-      compute_time     = compute_time
+      compute_time     = compute_time,
+      target           = target,
+      excluded         = excluded,
+      data             = data
     ),
     class = "svyder"
   )
@@ -196,6 +209,12 @@ validate_svyder <- function(x) {
 #' @return Logical; \code{TRUE} if \code{x} inherits from class
 #'   \code{"svyder"}, \code{FALSE} otherwise.
 #'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
+#'
 #' @family svyder-methods
 #'
 #' @examples
@@ -206,7 +225,7 @@ validate_svyder <- function(x) {
 #'   nsece_demo$draws,
 #'   y = nsece_demo$y, X = nsece_demo$X,
 #'   group = nsece_demo$group, weights = nsece_demo$weights,
-#'   psu = nsece_demo$psu, family = "binomial",
+#'   cluster = nsece_demo$psu, family = "binomial",
 #'   sigma_theta = nsece_demo$sigma_theta,
 #'   param_types = nsece_demo$param_types
 #' )

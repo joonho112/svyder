@@ -5,7 +5,8 @@
 # Provides extract_draws.stanreg() and der_compute.stanreg().
 # rstanarm stores the data, formula, and family in the fit object,
 # enabling auto-detection of y, X, group, and family.
-# Survey weights and PSU must still be provided by the user.
+# Survey weights and the cluster (sandwich aggregation unit) must still
+# be provided by the user.
 ###############################################################################
 
 #' @rdname extract_draws
@@ -155,14 +156,19 @@ extract_draws.stanreg <- function(x, ..., pars = NULL) {
 #' vector \code{y}, design matrix \code{X}, grouping variable \code{group},
 #' model \code{family}, random effect SD \code{sigma_theta}, and residual SD
 #' \code{sigma_e} (for gaussian) from the fitted model object. The user must
-#' provide \code{weights} (survey weights) and optionally \code{psu} (primary
-#' sampling unit indicators).
+#' provide \code{weights} (survey weights) and \code{cluster} (the sandwich
+#' aggregation unit); \code{strata}, \code{normalize}, \code{center_meat},
+#' and \code{df_correct} are passed through to the matrix method.
 #'
 #' @export
-der_compute.stanreg <- function(x, ..., weights, psu = NULL,
+der_compute.stanreg <- function(x, ..., weights,
+                                 cluster = NULL, strata = NULL,
+                                 psu = NULL,
                                  sigma_theta = NULL,
                                  sigma_e = NULL,
-                                 beta_prior_sd = 5,
+                                 normalize = c("unit_mean", "group_size", "none"),
+                                 center_meat = TRUE, df_correct = TRUE,
+                                 beta_prior_sd = Inf,
                                  param_types = NULL,
                                  design = NULL) {
   if (!requireNamespace("rstanarm", quietly = TRUE)) {
@@ -171,12 +177,31 @@ der_compute.stanreg <- function(x, ..., weights, psu = NULL,
          call. = FALSE)
   }
 
+  # --- Deprecated psu alias (resolved here so it is not forwarded) ---
+  if (!is.null(psu)) {
+    if (is.null(cluster)) {
+      warning("'psu' is deprecated; use 'cluster'. ",
+              "Treating psu as the cluster (aggregation unit).",
+              call. = FALSE)
+      cluster <- psu
+    } else {
+      stop("Supply either 'cluster' or the deprecated 'psu', not both.",
+           call. = FALSE)
+    }
+  }
+
   # --- Extract design info from survey.design2 if provided ---
   if (!is.null(design)) {
     design_info <- extract_design(design)
     weights <- design_info$weights
-    psu_var <- design_info$cluster
-    psu <- as.integer(as.factor(psu_var))
+    cluster_var <- design_info$cluster
+    cluster <- as.integer(as.factor(cluster_var))
+    if (is.null(strata) && !is.null(design_info$strata)) {
+      strata_var <- design_info$strata[[1]]
+      if (length(unique(strata_var)) > 1L) {
+        strata <- as.integer(as.factor(strata_var))
+      }
+    }
   }
 
   # --- Auto-detect family ---
@@ -289,10 +314,14 @@ der_compute.stanreg <- function(x, ..., weights, psu = NULL,
     X             = X,
     group         = group,
     weights       = weights,
-    psu           = psu,
+    cluster       = cluster,
+    strata        = strata,
     family        = family,
     sigma_theta   = sigma_theta,
     sigma_e       = sigma_e,
+    normalize     = normalize,
+    center_meat   = center_meat,
+    df_correct    = df_correct,
     beta_prior_sd = beta_prior_sd,
     param_types   = param_types,
     design        = NULL  # Already extracted above

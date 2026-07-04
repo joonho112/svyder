@@ -4,7 +4,7 @@
 \alias{glance.svyder}
 \title{Glance at a svyder Object}
 \usage{
-glance.svyder(x, ...)
+\method{glance}{svyder}(x, ...)
 }
 \arguments{
 \item{x}{A \code{svyder} object.}
@@ -38,21 +38,27 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
-glance.svyder(result)
+glance(result)
 
+}
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
 }
 \seealso{
 \code{\link[=tidy.svyder]{tidy.svyder()}} for per-parameter summaries.
 
-Other svyder-methods: 
-\code{\link{as.matrix.svyder}()},
-\code{\link{is.svyder}()},
-\code{\link{print.svyder}()},
-\code{\link{summary.svyder}()},
-\code{\link{tidy.svyder}()}
+Other svyder-methods:
+\code{\link[=as.matrix.svyder]{as.matrix.svyder()}},
+\code{\link[=is.svyder]{is.svyder()}},
+\code{\link[=print.svyder]{print.svyder()}},
+\code{\link[=summary.svyder]{summary.svyder()}},
+\code{\link[=tidy.svyder]{tidy.svyder()}}
 }
 \concept{svyder-methods}

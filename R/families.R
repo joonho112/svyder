@@ -57,19 +57,33 @@
   )
 }
 
-# Weighted residuals for score computation
-# Ported from standalone compute_der.R line 98
+# Weighted score residuals for the eta-scale score
 #
-# For both families: r_i = w_i * (y_i - mu_i)
+# The score of the log-density with respect to the linear predictor eta:
+#   binomial (logit): d/d_eta log f = (y - mu)          -> r_i = w_i (y_i - mu_i)
+#   gaussian:         d/d_eta log f = (y - mu)/sigma_e^2 -> r_i = w_i (y_i - mu_i)/sigma_e^2
+#
+# The gaussian 1/sigma_e^2 factor is required so that the meat matches the
+# bread's working weights (w/sigma_e^2); omitting it makes the sandwich --
+# and hence the DER -- scale like sigma_e^4 under a change of response units.
 #
 # @param family Character string: "binomial" or "gaussian"
 # @param y Numeric vector of responses (length N)
 # @param mu Numeric vector of fitted means (length N)
 # @param w Numeric vector of survey weights (length N)
-# @return Numeric vector of weighted residuals (length N)
-.compute_residuals <- function(family, y, mu, w) {
-  # Same formula for both families
-  w * (y - mu)
+# @param sigma_e Numeric scalar, residual SD (required for gaussian)
+# @return Numeric vector of weighted score residuals (length N)
+.compute_residuals <- function(family, y, mu, w, sigma_e = NULL) {
+  switch(family,
+    binomial = w * (y - mu),
+    gaussian = {
+      if (is.null(sigma_e) || !is.numeric(sigma_e) || length(sigma_e) != 1L || sigma_e <= 0) {
+        stop("'sigma_e' must be a positive numeric scalar for the gaussian family.")
+      }
+      w * (y - mu) / sigma_e^2
+    },
+    stop(sprintf("Unknown family '%s'. Supported families: 'binomial', 'gaussian'.", family))
+  )
 }
 
 # Working weights WITHOUT survey weights (for shrinkage computation)

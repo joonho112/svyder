@@ -33,9 +33,9 @@ Synthetic data. See \code{data-raw/generate_sim_hlr.R}.
 sim_hlr
 }
 \description{
-A small balanced Gaussian hierarchical model dataset for quick
-testing and demonstration. Contains J = 10 groups with n_j = 20
-observations each (N = 200 total), equal weights (DEFF = 1),
+A small, fully \strong{synthetic} balanced Gaussian hierarchical model
+dataset for quick testing and demonstration. Contains J = 10 groups with
+n_j = 20 observations each (N = 200 total), equal weights (DEFF = 1),
 and two fixed-effect covariates (intercept + within-cluster
 covariate).
 }
@@ -49,4 +49,15 @@ design effects.
 data(sim_hlr)
 str(sim_hlr, max.level = 1)
 }
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
+}
+\seealso{
+Other datasets:
+\code{\link{nsece_demo}}
+}
+\concept{datasets}
 \keyword{datasets}

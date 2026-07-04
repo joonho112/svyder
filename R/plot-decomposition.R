@@ -17,8 +17,8 @@
     param      = decomp$param,
     param_type = decomp$param_type,
     der        = decomp$der,
-    B_mean     = decomp$B_mean,
-    deff_mean  = decomp$deff_mean,
+    B_used     = decomp$B_used,
+    deff_used  = decomp$deff_used,
     R_k        = decomp$R_k,
     der_predicted = decomp$der_predicted,
     stringsAsFactors = FALSE

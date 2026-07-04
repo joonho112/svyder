@@ -2,56 +2,69 @@
 % Please edit documentation in R/der_compare.R
 \name{der_compare}
 \alias{der_compare}
-\title{Compare DER Across Clustering Definitions}
+\title{Compare DER Across Variance Targets}
 \usage{
 der_compare(x, clusters, ...)
 }
 \arguments{
-\item{x}{A draws matrix (S x d) or a \code{svyder} object.
-If a \code{svyder} object, the original draws and data
-are extracted automatically.}
+\item{x}{A \code{svyder} object (preferred) or a draws matrix (S x d).}
 
-\item{clusters}{A named list of PSU vectors to compare.
-Each element should be an integer vector of length N.}
+\item{clusters}{A named list of cluster-id vectors (each length N), one
+per target to compare.}
 
-\item{...}{Additional arguments passed to \code{\link[=der_compute]{der_compute()}}.
-Required when \code{x} is a matrix: \code{y}, \code{X}, \code{group},
-\code{weights}, \code{family}, \code{sigma_theta}, etc.}
+\item{...}{For the matrix path only: arguments passed to \code{\link[=der_compute]{der_compute()}}
+(\code{y}, \code{X}, \code{group}, \code{weights}, \code{family},
+\code{sigma_theta}, ...).}
 }
 \value{
-A \code{data.frame} with columns: \code{param}, \code{cluster_name},
-\code{der}.
+A \code{data.frame} with columns: \code{param},
+\code{cluster_name}, \code{der}.
 }
 \description{
-Computes DER using different clustering (PSU) definitions
-and compares the results. This is useful for comparing, e.g.,
-state-level vs PSU-level clustering to assess sensitivity
-of DER to the choice of primary sampling unit.
+Computes DER under different sandwich aggregation units (e.g., the
+design PSU vs the model group) and compares the results side by side.
+Because the aggregation unit is part of the variance-target definition,
+reporting both is the recommended practice whenever the design PSUs and
+the model groups differ.
+}
+\details{
+When \code{x} is a \code{svyder} object from svyder >= 0.2.0, the stored
+data slots are reused: only the meat is rebuilt per target (the bread and
+the MCMC covariance are target-invariant), so the comparison is fast and
+requires no re-supply of \code{y}/\code{X}/\code{weights}.
+If the stored object used \code{cluster_strata} to declare selected-but-empty
+clusters, that declared universe is preserved when a comparison target is
+exactly the original stored target.
 }
 \examples{
 data(nsece_demo)
-# Compare DER using original PSU vs group-level clustering
-comp <- der_compare(
+result <- der_compute(
   nsece_demo$draws,
-  clusters = list(
-    psu   = nsece_demo$psu,
-    group = nsece_demo$group
-  ),
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
+comp <- der_compare(result, clusters = list(
+  design_psu  = nsece_demo$psu,
+  model_group = nsece_demo$group
+))
 head(comp)
 
 }
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
+}
 \seealso{
-\code{\link[=der_compute]{der_compute()}} for computing DER with a single clustering.
+\code{\link[=der_compute]{der_compute()}} for computing DER under a single target.
 
-Other analysis: 
-\code{\link{der_decompose}()},
-\code{\link{der_sensitivity}()},
-\code{\link{der_theorem_check}()}
+Other analysis:
+\code{\link[=der_decompose]{der_decompose()}},
+\code{\link[=der_sensitivity]{der_sensitivity()}},
+\code{\link[=der_theorem_check]{der_theorem_check()}}
 }
 \concept{analysis}

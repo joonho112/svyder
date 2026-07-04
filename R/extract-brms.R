@@ -5,8 +5,9 @@
 # Provides extract_draws.brmsfit() and der_compute.brmsfit().
 # The brms package stores the full model specification (data, formula,
 # family, priors) in the fit object, enabling auto-detection of most
-# DER computation inputs. Survey weights and PSU must still be provided
-# by the user since brms does not store survey design information.
+# DER computation inputs. Survey weights and the cluster (sandwich
+# aggregation unit) must still be provided by the user since brms does
+# not store survey design information.
 ###############################################################################
 
 #' @rdname extract_draws
@@ -143,18 +144,23 @@ extract_draws.brmsfit <- function(x, ..., pars = NULL) {
 #' \code{y}, design matrix \code{X}, grouping variable \code{group}, model
 #' \code{family}, and random effect SD \code{sigma_theta} from the fitted
 #' model object. The user must provide \code{weights} (survey weights) and
-#' optionally \code{psu} (primary sampling unit indicators), since these are
-#' not stored in brms fit objects.
+#' \code{cluster} (the sandwich aggregation unit), since these are not
+#' stored in brms fit objects. \code{strata}, \code{normalize},
+#' \code{center_meat}, and \code{df_correct} are passed through to the
+#' matrix method.
 #'
 #' The \code{group} argument can optionally be provided to override auto-detection
 #' from the random effects structure.
 #'
 #' @export
 der_compute.brmsfit <- function(x, ..., weights, group = NULL,
+                                 cluster = NULL, strata = NULL,
                                  psu = NULL, family = NULL,
                                  sigma_theta = NULL,
                                  sigma_e = NULL,
-                                 beta_prior_sd = 5,
+                                 normalize = c("unit_mean", "group_size", "none"),
+                                 center_meat = TRUE, df_correct = TRUE,
+                                 beta_prior_sd = Inf,
                                  param_types = NULL, design = NULL) {
   if (!requireNamespace("brms", quietly = TRUE)) {
     stop("Package 'brms' is required for der_compute.brmsfit(). ",
@@ -167,12 +173,31 @@ der_compute.brmsfit <- function(x, ..., weights, group = NULL,
          call. = FALSE)
   }
 
+  # --- Deprecated psu alias (resolved here so it is not forwarded) ---
+  if (!is.null(psu)) {
+    if (is.null(cluster)) {
+      warning("'psu' is deprecated; use 'cluster'. ",
+              "Treating psu as the cluster (aggregation unit).",
+              call. = FALSE)
+      cluster <- psu
+    } else {
+      stop("Supply either 'cluster' or the deprecated 'psu', not both.",
+           call. = FALSE)
+    }
+  }
+
   # --- Extract design info from survey.design2 if provided ---
   if (!is.null(design)) {
     design_info <- extract_design(design)
     weights <- design_info$weights
-    psu_var <- design_info$cluster
-    psu <- as.integer(as.factor(psu_var))
+    cluster_var <- design_info$cluster
+    cluster <- as.integer(as.factor(cluster_var))
+    if (is.null(strata) && !is.null(design_info$strata)) {
+      strata_var <- design_info$strata[[1]]
+      if (length(unique(strata_var)) > 1L) {
+        strata <- as.integer(as.factor(strata_var))
+      }
+    }
   }
 
   # --- Auto-detect family ---
@@ -303,10 +328,14 @@ der_compute.brmsfit <- function(x, ..., weights, group = NULL,
     X             = X,
     group         = group,
     weights       = weights,
-    psu           = psu,
+    cluster       = cluster,
+    strata        = strata,
     family        = family,
     sigma_theta   = sigma_theta,
     sigma_e       = sigma_e,
+    normalize     = normalize,
+    center_meat   = center_meat,
+    df_correct    = df_correct,
     beta_prior_sd = beta_prior_sd,
     param_types   = param_types,
     design        = NULL  # Already extracted above

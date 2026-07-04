@@ -20,13 +20,21 @@
 #'     \item{estimate}{Posterior mean (from original draws).}
 #'     \item{std.error}{Posterior standard deviation (from original draws).}
 #'     \item{der}{Design Effect Ratio.}
-#'     \item{tier}{Three-tier classification (if classified).}
+#'     \item{tier}{Design-sensitivity tier (if classified).}
 #'     \item{action}{Action label: \code{"CORRECT"} or \code{"retain"}
 #'       (if classified).}
 #'     \item{flagged}{Logical; whether the parameter is flagged for
 #'       correction (if classified).}
-#'     \item{scale_factor}{Cholesky scale factor applied to this parameter.}
+#'     \item{scale_factor}{Marginal SD ratio recorded for the correction.
+#'       Under \code{method = "block_cholesky"}, this is a reported marginal
+#'       ratio, not a per-parameter scalar transform.}
 #'   }
+#'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
 #'
 #' @seealso [glance.svyder()] for model-level summaries,
 #'   [print.svyder()] for console output.
@@ -38,13 +46,13 @@
 #'   nsece_demo$draws,
 #'   y = nsece_demo$y, X = nsece_demo$X,
 #'   group = nsece_demo$group, weights = nsece_demo$weights,
-#'   psu = nsece_demo$psu, family = "binomial",
+#'   cluster = nsece_demo$psu, family = "binomial",
 #'   sigma_theta = nsece_demo$sigma_theta,
 #'   param_types = nsece_demo$param_types
 #' )
-#' head(tidy.svyder(result))
+#' head(tidy(result))
 #'
-#' @export
+#' @exportS3Method generics::tidy
 tidy.svyder <- function(x, ...) {
 
   d <- length(x$der)
@@ -107,6 +115,12 @@ tidy.svyder <- function(x, ...) {
 #'     \item{der_max}{Maximum DER value.}
 #'   }
 #'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
+#'
 #' @seealso [tidy.svyder()] for per-parameter summaries.
 #' @family svyder-methods
 #'
@@ -116,13 +130,13 @@ tidy.svyder <- function(x, ...) {
 #'   nsece_demo$draws,
 #'   y = nsece_demo$y, X = nsece_demo$X,
 #'   group = nsece_demo$group, weights = nsece_demo$weights,
-#'   psu = nsece_demo$psu, family = "binomial",
+#'   cluster = nsece_demo$psu, family = "binomial",
 #'   sigma_theta = nsece_demo$sigma_theta,
 #'   param_types = nsece_demo$param_types
 #' )
-#' glance.svyder(result)
+#' glance(result)
 #'
-#' @export
+#' @exportS3Method generics::glance
 glance.svyder <- function(x, ...) {
 
   d <- length(x$der)

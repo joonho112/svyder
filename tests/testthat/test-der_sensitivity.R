@@ -12,7 +12,7 @@
     X = fix$X,
     group = fix$group,
     weights = fix$w,
-    psu = fix$psu,
+    cluster = fix$psu,
     family = fix$family,
     sigma_theta = fix$sigma_theta_hat,
     sigma_e = sigma_e_arg,

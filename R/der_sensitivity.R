@@ -20,6 +20,12 @@
 #'   \code{pct_flagged}, and \code{flagged_params} (a list-column of
 #'   character vectors naming the flagged parameters at each threshold).
 #'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
+#'
 #' @seealso [der_classify()] for classification at a single threshold.
 #' @family analysis
 #'
@@ -29,7 +35,7 @@
 #'   nsece_demo$draws,
 #'   y = nsece_demo$y, X = nsece_demo$X,
 #'   group = nsece_demo$group, weights = nsece_demo$weights,
-#'   psu = nsece_demo$psu, family = "binomial",
+#'   cluster = nsece_demo$psu, family = "binomial",
 #'   sigma_theta = nsece_demo$sigma_theta,
 #'   param_types = nsece_demo$param_types
 #' )

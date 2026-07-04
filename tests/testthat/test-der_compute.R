@@ -13,7 +13,7 @@
     X            = fix$X,
     group        = fix$group,
     weights      = fix$w,
-    psu          = fix$psu,
+    cluster      = fix$psu,
     family       = fix$family,
     sigma_theta  = fix$sigma_theta_hat,
     sigma_e      = fix$sigma_e,
@@ -54,7 +54,7 @@ test_that("pipe-friendly: returns svyder", {
   result <- der_compute(
     draws_all,
     y = fix$y, X = fix$X, group = fix$group,
-    weights = fix$w, psu = fix$psu,
+    weights = fix$w, cluster = fix$psu,
     family = "gaussian", sigma_theta = fix$sigma_theta_hat,
     sigma_e = fix$sigma_e, beta_prior_sd = fix$beta_prior_sd,
     param_types = fix$param_types
@@ -111,7 +111,7 @@ test_that("matches standalone compute_der()", {
     param_types      = fix$param_types
   )
 
-  # --- Run svyder ---
+  # --- Run svyder (legacy meat flags reproduce the v1 pipeline) ---
   draws_all <- cbind(fix$draws_beta, fix$draws_theta)
   svyder_result <- der_compute(
     draws_all,
@@ -119,9 +119,11 @@ test_that("matches standalone compute_der()", {
     X            = fix$X,
     group        = fix$group,
     weights      = fix$w,
-    psu          = fix$psu,
+    cluster      = fix$psu,
     family       = "binomial",
     sigma_theta  = fix$sigma_theta_hat,
+    center_meat  = FALSE,
+    df_correct   = FALSE,
     beta_prior_sd = fix$beta_prior_sd,
     param_types  = fix$param_types
   )
@@ -233,4 +235,194 @@ test_that("V_sand is symmetric", {
   fix <- make_balanced_gaussian()
   result <- .run_der_compute(fix)
   expect_equal(result$V_sand, t(result$V_sand))
+})
+
+
+# ============================================================================
+# Declared variance target: cluster is required
+# ============================================================================
+
+test_that("missing cluster errors informatively", {
+  fix <- make_balanced_gaussian()
+  draws_all <- cbind(fix$draws_beta, fix$draws_theta)
+  expect_error(
+    der_compute(
+      draws_all,
+      y = fix$y, X = fix$X, group = fix$group,
+      weights = fix$w,
+      family = "gaussian", sigma_theta = fix$sigma_theta_hat,
+      sigma_e = fix$sigma_e, param_types = fix$param_types
+    ),
+    "'cluster' must be supplied explicitly"
+  )
+})
+
+test_that("psu is a deprecated alias for cluster", {
+  fix <- make_balanced_gaussian()
+  draws_all <- cbind(fix$draws_beta, fix$draws_theta)
+
+  result_cluster <- .run_der_compute(fix)
+
+  expect_warning(
+    result_psu <- der_compute(
+      draws_all,
+      y = fix$y, X = fix$X, group = fix$group,
+      weights = fix$w, psu = fix$psu,
+      family = "gaussian", sigma_theta = fix$sigma_theta_hat,
+      sigma_e = fix$sigma_e, beta_prior_sd = fix$beta_prior_sd,
+      param_types = fix$param_types
+    ),
+    "'psu' is deprecated"
+  )
+  expect_equal(as.numeric(result_psu$der), as.numeric(result_cluster$der),
+               tolerance = 1e-12)
+})
+
+test_that("supplying both cluster and psu errors", {
+  fix <- make_balanced_gaussian()
+  draws_all <- cbind(fix$draws_beta, fix$draws_theta)
+  expect_error(
+    der_compute(
+      draws_all,
+      y = fix$y, X = fix$X, group = fix$group,
+      weights = fix$w, cluster = fix$psu, psu = fix$psu,
+      family = "gaussian", sigma_theta = fix$sigma_theta_hat,
+      sigma_e = fix$sigma_e, param_types = fix$param_types
+    ),
+    "not both"
+  )
+})
+
+
+# ============================================================================
+# param_types inference
+# ============================================================================
+
+test_that("param_types = NULL emits a message and infers types", {
+  fix <- make_unbalanced_binomial()  # X = [intercept, x1 (within-varying)]
+  draws_all <- cbind(fix$draws_beta, fix$draws_theta)
+
+  expect_message(
+    result <- der_compute(
+      draws_all,
+      y = fix$y, X = fix$X, group = fix$group,
+      weights = fix$w, cluster = fix$psu,
+      family = "binomial", sigma_theta = fix$sigma_theta_hat,
+      beta_prior_sd = fix$beta_prior_sd
+    ),
+    "param_types inferred"
+  )
+
+  inferred <- result$classification$param_type[seq_len(fix$p)]
+  expect_equal(inferred[1], "fe_between")  # intercept: constant within groups
+  expect_equal(inferred[2], "fe_within")   # x1: varies within groups
+})
+
+
+# ============================================================================
+# Weight normalization convention
+# ============================================================================
+
+test_that("normalize = 'unit_mean' is recorded and weights rescaled to mean 1", {
+  fix <- make_unbalanced_binomial()
+  draws_all <- cbind(fix$draws_beta, fix$draws_theta)
+
+  # Rescale the fixture weights so raw mean != 1
+  w_raw <- fix$w * 7
+
+  result <- der_compute(
+    draws_all,
+    y = fix$y, X = fix$X, group = fix$group,
+    weights = w_raw, cluster = fix$psu,
+    family = "binomial", sigma_theta = fix$sigma_theta_hat,
+    normalize = "unit_mean",
+    beta_prior_sd = fix$beta_prior_sd,
+    param_types = fix$param_types
+  )
+
+  expect_equal(result$target$normalize, "unit_mean")
+  expect_equal(result$target$weights_raw_mean, mean(w_raw), tolerance = 1e-12)
+  expect_equal(mean(result$data$weights), 1.0, tolerance = 1e-12)
+
+  # DER must be invariant to overall weight rescaling under unit_mean
+  result_base <- der_compute(
+    draws_all,
+    y = fix$y, X = fix$X, group = fix$group,
+    weights = fix$w, cluster = fix$psu,
+    family = "binomial", sigma_theta = fix$sigma_theta_hat,
+    normalize = "unit_mean",
+    beta_prior_sd = fix$beta_prior_sd,
+    param_types = fix$param_types
+  )
+  expect_equal(as.numeric(result$der), as.numeric(result_base$der),
+               tolerance = 1e-10)
+})
+
+test_that("normalize = 'none' uses weights as supplied", {
+  fix <- make_unbalanced_binomial()
+  draws_all <- cbind(fix$draws_beta, fix$draws_theta)
+
+  result <- der_compute(
+    draws_all,
+    y = fix$y, X = fix$X, group = fix$group,
+    weights = fix$w, cluster = fix$psu,
+    family = "binomial", sigma_theta = fix$sigma_theta_hat,
+    normalize = "none",
+    beta_prior_sd = fix$beta_prior_sd,
+    param_types = fix$param_types
+  )
+
+  expect_equal(result$target$normalize, "none")
+  expect_equal(result$data$weights, fix$w, tolerance = 1e-15)
+})
+
+
+# ============================================================================
+# Target metadata and Tier III exclusion table
+# ============================================================================
+
+test_that("target metadata records the declared variance target", {
+  fix <- make_balanced_gaussian()
+  result <- .run_der_compute(fix)
+
+  tg <- result$target
+  expect_type(tg, "list")
+  expect_equal(tg$cluster_n, length(unique(fix$psu)))
+  expect_true(tg$cluster_is_group)  # fixture uses psu = group
+  expect_equal(tg$strata_n, 1L)
+  expect_true(tg$center)
+  expect_true(tg$df_correct)
+  expect_equal(tg$normalize, "unit_mean")
+  expect_equal(tg$sigma_theta, fix$sigma_theta_hat)
+})
+
+test_that("Tier III exclusion table lists hyperparameters", {
+  fix_g <- make_balanced_gaussian()
+  result_g <- .run_der_compute(fix_g)
+  expect_s3_class(result_g$excluded, "data.frame")
+  expect_setequal(result_g$excluded$param, c("sigma_theta", "sigma_e"))
+  expect_true(all(result_g$excluded$tier == "III"))
+  reason_theta <- result_g$excluded$reason[result_g$excluded$param == "sigma_theta"]
+  reason_sigma_e <- result_g$excluded$reason[result_g$excluded$param == "sigma_e"]
+  expect_match(reason_theta, "prior hyperparameter", fixed = TRUE)
+  expect_match(reason_theta, "data-level phi=(beta, theta) score block", fixed = TRUE)
+  expect_match(reason_sigma_e, "gaussian dispersion plug-in", fixed = TRUE)
+  expect_match(reason_sigma_e, "location-block sandwich", fixed = TRUE)
+  expect_false(identical(reason_theta, reason_sigma_e))
+
+  fix_b <- make_unbalanced_binomial()
+  result_b <- .run_der_compute(fix_b)
+  expect_equal(result_b$excluded$param, "sigma_theta")
+  expect_match(result_b$excluded$reason, "prior hyperparameter", fixed = TRUE)
+})
+
+test_that("data slots are stored for re-targeting", {
+  fix <- make_unbalanced_binomial()
+  result <- .run_der_compute(fix)
+
+  expect_type(result$data, "list")
+  expect_true(all(c("X", "group", "weights", "cluster", "strata", "v", "r")
+                  %in% names(result$data)))
+  expect_equal(nrow(result$data$X), fix$N)
+  expect_equal(length(result$data$r), fix$N)
 })

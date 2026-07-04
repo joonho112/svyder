@@ -28,7 +28,7 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
@@ -36,12 +36,18 @@ sens <- der_sensitivity(result)
 sens[, c("tau", "n_flagged", "pct_flagged")]
 
 }
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
+}
 \seealso{
 \code{\link[=der_classify]{der_classify()}} for classification at a single threshold.
 
-Other analysis: 
-\code{\link{der_compare}()},
-\code{\link{der_decompose}()},
-\code{\link{der_theorem_check}()}
+Other analysis:
+\code{\link[=der_compare]{der_compare()}},
+\code{\link[=der_decompose]{der_decompose()}},
+\code{\link[=der_theorem_check]{der_theorem_check()}}
 }
 \concept{analysis}

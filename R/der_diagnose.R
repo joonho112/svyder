@@ -15,9 +15,17 @@
 #' @inheritParams der_compute
 #' @param tau Classification threshold (default 1.2).
 #' @param correct Apply correction to flagged parameters (default \code{TRUE}).
+#' @param method Correction method passed to [der_correct()]
+#'   (default \code{"block_cholesky"}).
 #'
 #' @return A fully processed \code{svyder} object with DER values,
 #'   classification, and (optionally) corrected draws.
+#'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
 #'
 #' @seealso [der_compute()], [der_classify()], [der_correct()] for the
 #'   individual pipeline steps. [tidy.svyder()] and [glance.svyder()] for
@@ -30,7 +38,7 @@
 #'   nsece_demo$draws,
 #'   y = nsece_demo$y, X = nsece_demo$X,
 #'   group = nsece_demo$group, weights = nsece_demo$weights,
-#'   psu = nsece_demo$psu, family = "binomial",
+#'   cluster = nsece_demo$psu, family = "binomial",
 #'   sigma_theta = nsece_demo$sigma_theta,
 #'   param_types = nsece_demo$param_types
 #' )
@@ -38,11 +46,13 @@
 #' summary(result)
 #'
 #' @export
-der_diagnose <- function(x, ..., tau = 1.2, correct = TRUE) {
+der_diagnose <- function(x, ..., tau = 1.2, correct = TRUE,
+                         method = c("block_cholesky", "marginal")) {
+  method <- match.arg(method)
   result <- der_compute(x, ...)
   result <- der_classify(result, tau = tau, verbose = FALSE)
   if (correct) {
-    result <- der_correct(result)
+    result <- der_correct(result, method = method)
   }
   result
 }

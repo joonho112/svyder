@@ -131,6 +131,10 @@
 
 # Validate svyder object structure
 #
+# Lightweight check that the components every svyder object carries (see
+# new_svyder() in classes.R) are present. For full dimensional checks use
+# validate_svyder() in classes.R.
+#
 # @param x An object to check
 # @return Invisible TRUE if valid; otherwise stops with error
 .validate_svyder <- function(x) {
@@ -146,8 +150,8 @@
     .stop_msg("Object must be of class 'svyder'.")
   }
 
-  required_components <- c("der", "classification", "V_sand", "sigma_mcmc",
-                           "diagnostics")
+  required_components <- c("der", "params", "H_obs", "J_cluster",
+                           "V_sand", "sigma_mcmc", "classification")
   missing <- setdiff(required_components, names(x))
   if (length(missing) > 0L) {
     .stop_msg(sprintf(

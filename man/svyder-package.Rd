@@ -14,8 +14,8 @@ a compute-classify-correct diagnostic framework:
 \enumerate{
 \item \strong{Compute}: Calculate DER for each parameter using a sandwich
 variance estimator.
-\item \strong{Classify}: Assign parameters to three tiers based on their
-information source and flag those exceeding a threshold.
+\item \strong{Classify}: Assign estimable parameters by information source
+and flag those exceeding a threshold.
 \item \strong{Correct}: Apply selective Cholesky correction to flagged
 parameters only.
 }
@@ -24,7 +24,7 @@ parameters only.
 
 \itemize{
 \item \code{\link[=der_compute]{der_compute()}}: Compute DER values.
-\item \code{\link[=der_classify]{der_classify()}}: Three-tier classification.
+\item \code{\link[=der_classify]{der_classify()}}: Estimable-parameter classification.
 \item \code{\link[=der_correct]{der_correct()}}: Selective Cholesky correction.
 \item \code{\link[=der_diagnose]{der_diagnose()}}: All-in-one wrapper.
 }
@@ -58,9 +58,16 @@ parameters only.
 }
 }
 
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
+}
 \seealso{
 Useful links:
 \itemize{
+  \item \url{https://joonho112.github.io/svyder/}
   \item \url{https://github.com/joonho112/svyder}
   \item Report bugs at \url{https://github.com/joonho112/svyder/issues}
 }
@@ -68,6 +75,11 @@ Useful links:
 }
 \author{
 \strong{Maintainer}: JoonHo Lee \email{jlee296@ua.edu} (\href{https://orcid.org/0009-0006-4019-8703}{ORCID})
+
+Authors:
+\itemize{
+  \item JoonHo Lee \email{jlee296@ua.edu} (\href{https://orcid.org/0009-0006-4019-8703}{ORCID})
+}
 
 }
 \keyword{internal}

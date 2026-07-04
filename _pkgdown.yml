@@ -5,67 +5,128 @@ template:
   bootswatch: cosmo
   bslib:
     primary: "#4393C3"
+  math-rendering: katex
+
+authors:
+  JoonHo Lee:
+    href: https://github.com/joonho112
+
+home:
+  title: "svyder: Design Effect Ratio Diagnostics for Bayesian Survey Models"
+  description: >
+    Compute parameter-level Design Effect Ratios (DER) for Bayesian
+    hierarchical models fitted to complex survey data, and correct only the
+    parameters that need it with the compute-classify-correct framework.
+
+navbar:
+  structure:
+    left:  [intro, reference, articles, news]
+    right: [search, github]
+  components:
+    intro:
+      text: Get started
+      href: articles/getting-started.html
+    articles:
+      text: Articles
+      menu:
+        - text: "--- Applied track ---"
+        - text: "Getting Started with svyder"
+          href: articles/getting-started.html
+        - text: "Choosing the Variance Target"
+          href: articles/choosing-the-target.html
+        - text: "The Compute-Classify-Correct Pipeline"
+          href: articles/pipeline.html
+        - text: "Case Study: NSECE-Style Survey Data"
+          href: articles/case-study-nsece.html
+        - text: "Backends: brms, cmdstanr, rstanarm, survey"
+          href: articles/backends.html
+        - text: "--- Method track ---"
+        - text: "The Design Effect Ratio: Definition and Regimes"
+          href: articles/theory-der.html
+        - text: "The Declared Variance Target: Bread and Meat"
+          href: articles/theory-sandwich.html
+        - text: "Decomposition Theorems and the Conservation Law"
+          href: articles/theory-decomposition.html
+        - text: "Classification and Selective Correction"
+          href: articles/theory-classification-correction.html
+
+articles:
+  - title: "Applied track"
+    desc: >
+      Workflow-first guides for using svyder in practice --- run the pipeline,
+      choose the variance target, and report results.
+    contents:
+      - getting-started
+      - choosing-the-target
+      - pipeline
+      - case-study-nsece
+      - backends
+  - title: "Method track"
+    desc: >
+      The mathematical foundations of the DER framework, for readers who want
+      the derivations.
+    contents:
+      - theory-der
+      - theory-sandwich
+      - theory-decomposition
+      - theory-classification-correction
 
 reference:
-  - title: Core Pipeline
+  - title: "Core pipeline"
+    desc: >
+      The compute-classify-correct workflow. Use `der_diagnose()` for the
+      all-in-one call, or invoke the three steps individually for finer control.
     contents:
       - der_diagnose
       - der_compute
       - der_classify
       - der_correct
 
-  - title: Analysis Tools
+  - title: "Analysis"
+    desc: >
+      Understand, verify, and re-target DER results.
     contents:
       - der_decompose
       - der_sensitivity
       - der_theorem_check
       - der_compare
 
-  - title: Output Methods
+  - title: "Object methods"
+    desc: >
+      S3 methods for `svyder` objects: printing, summaries, corrected draws, and
+      broom-style tidiers.
     contents:
       - print.svyder
       - summary.svyder
       - tidy.svyder
       - glance.svyder
       - as.matrix.svyder
+      - is.svyder
 
-  - title: Visualization
+  - title: "Visualization"
+    desc: >
+      Diagnostic plots for DER results: profile, decomposition, and comparison
+      views, with an automatic ggplot2 / base R fallback.
     contents:
       - plot.svyder
       - autoplot.svyder
 
-  - title: Backend Integration
+  - title: "Backends"
+    desc: >
+      Generic extractors for posterior draws and survey design objects. Methods
+      exist for brms, cmdstanr, rstanarm, posterior, and the survey package.
     contents:
       - extract_draws
       - extract_design
 
-  - title: Classes
-    contents:
-      - new_svyder
-      - validate_svyder
-      - is.svyder
-
-  - title: Datasets
+  - title: "Bundled datasets"
+    desc: >
+      Synthetic datasets shipping pre-computed posterior draws, so no Stan
+      installation is required.
     contents:
       - nsece_demo
       - sim_hlr
 
-articles:
-  - title: Getting Started
+  - title: "Package"
     contents:
-      - getting-started
-
-  - title: Theory
-    contents:
-      - understanding-der
-      - decomposition-theorems
-
-  - title: Applications
-    contents:
-      - pipeline-in-depth
-      - case-study-nsece
-
-navbar:
-  structure:
-    left: [intro, reference, articles]
-    right: [search, github]
+      - svyder-package

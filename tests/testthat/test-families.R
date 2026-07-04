@@ -107,7 +107,7 @@ test_that("compute_mu errors on unknown family", {
 
 # --- compute_residuals ---
 
-test_that("residuals are w * (y - mu)", {
+test_that("binomial residuals are w * (y - mu)", {
   y <- c(1, 0, 1, 0)
   mu <- c(0.8, 0.3, 0.6, 0.2)
   w <- c(1.0, 2.0, 1.5, 0.5)
@@ -115,11 +115,40 @@ test_that("residuals are w * (y - mu)", {
   expect_equal(.compute_residuals("binomial", y, mu, w), expected)
 })
 
-test_that("residuals are zero when y equals mu", {
+test_that("gaussian residuals are w * (y - mu) / sigma_e^2", {
+  y <- c(1.5, -0.2, 3.0)
+  mu <- c(1.0, 0.3, 2.0)
+  w <- c(1.0, 2.0, 0.5)
+  sigma_e <- 2.0
+  expected <- w * (y - mu) / sigma_e^2
+  expect_equal(.compute_residuals("gaussian", y, mu, w, sigma_e = sigma_e),
+               expected)
+})
+
+test_that("gaussian residuals scale with 1/sigma_e^2", {
+  y <- c(1.5, -0.2)
+  mu <- c(1.0, 0.3)
+  w <- c(1.0, 2.0)
+  r1 <- .compute_residuals("gaussian", y, mu, w, sigma_e = 1.0)
+  r3 <- .compute_residuals("gaussian", y, mu, w, sigma_e = 3.0)
+  expect_equal(r3, r1 / 9)
+})
+
+test_that("gaussian residuals are zero when y equals mu", {
   y <- c(0.3, 0.7)
   mu <- c(0.3, 0.7)
   w <- c(1.0, 2.0)
-  expect_equal(.compute_residuals("gaussian", y, mu, w), c(0, 0))
+  expect_equal(.compute_residuals("gaussian", y, mu, w, sigma_e = 1.5),
+               c(0, 0))
+})
+
+test_that("gaussian residuals error on missing or invalid sigma_e", {
+  y <- c(0.3, 0.7)
+  mu <- c(0.1, 0.5)
+  w <- c(1.0, 2.0)
+  expect_error(.compute_residuals("gaussian", y, mu, w), "sigma_e")
+  expect_error(.compute_residuals("gaussian", y, mu, w, sigma_e = 0), "sigma_e")
+  expect_error(.compute_residuals("gaussian", y, mu, w, sigma_e = -2), "sigma_e")
 })
 
 

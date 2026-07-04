@@ -35,6 +35,11 @@
 # where V_tilde_j = 1 / sum(w_j * wt_j)
 # and wt = working weights WITHOUT survey weights (e.g., mu*(1-mu) for binomial)
 #
+# NOTE on semantics: B_j is the DATA share of the posterior precision for
+# theta_j (the weight on the group's own data in the posterior mean).
+# B_j -> 1 for data-rich groups (little shrinkage toward the prior mean);
+# B_j -> 0 for data-poor groups (heavy shrinkage).
+#
 # @param group Integer vector of group indicators (1:J), length N
 # @param w Numeric vector of survey weights, length N
 # @param wt Numeric vector of working weights WITHOUT survey weights, length N
@@ -61,8 +66,8 @@
 #
 # kappa_j = (J - 1) * (1 - B_j) / (J * (1 - B_j) + B_j)
 #
-# When B = 1 (complete shrinkage): kappa = 0
-# When B -> 0 (no shrinkage): kappa -> (J-1)/J
+# When B = 1 (data dominates; no shrinkage toward the prior mean): kappa = 0
+# When B -> 0 (complete shrinkage): kappa -> (J-1)/J
 #
 # @param B_j Numeric vector of shrinkage factors
 # @param J Integer, total number of groups

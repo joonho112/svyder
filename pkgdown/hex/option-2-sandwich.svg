@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 345" width="300" height="345">
+  <defs>
+    <linearGradient id="hexbg2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4E9AC9"/>
+      <stop offset="0.55" stop-color="#356FA8"/>
+      <stop offset="1" stop-color="#213F63"/>
+    </linearGradient>
+    <filter id="soft2" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#0E2740" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <path d="M150,5 L296,88.5 L296,257.5 L150,341 L4,257.5 L4,88.5 Z" fill="#1B4266"/>
+  <path d="M150,17 L285,94.5 L285,251.5 L150,329 L15,251.5 L15,94.5 Z" fill="url(#hexbg2)"/>
+
+  <!-- The sandwich estimator V = H^-1 J H^-1 : two "bread" layers + a "meat" core (numerator) -->
+  <g filter="url(#soft2)">
+    <rect x="86" y="96"  width="128" height="24" rx="7" fill="#CFE6F6"/>
+    <rect x="86" y="126" width="128" height="34" rx="8" fill="#F4A259"/>
+    <rect x="86" y="166" width="128" height="24" rx="7" fill="#CFE6F6"/>
+  </g>
+  <text x="150" y="113" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" fill="#2E6A97" letter-spacing="1">H&#8315;&#185;</text>
+  <text x="150" y="149" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#7A3B12" letter-spacing="2">J</text>
+  <text x="150" y="183" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" fill="#2E6A97" letter-spacing="1">H&#8315;&#185;</text>
+
+  <!-- ratio bar -->
+  <rect x="78" y="202" width="144" height="4" rx="2" fill="#EAF4FB"/>
+
+  <!-- posterior variance (denominator): a compact Gaussian -->
+  <path d="M84,244 C112,244 120,214 150,214 C180,214 188,244 216,244" fill="none" stroke="#BEE0F4" stroke-width="3.2" stroke-linecap="round"/>
+  <line x1="84" y1="244" x2="216" y2="244" stroke="#BEE0F4" stroke-width="1.4" opacity="0.5"/>
+
+  <!-- wordmark -->
+  <text x="150" y="292" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="46" font-weight="700" letter-spacing="1" fill="#FFFFFF">svyder</text>
+  <text x="150" y="312" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="10.5" font-weight="500" letter-spacing="2.4" fill="#D7EAF7">DESIGN EFFECT RATIOS</text>
+</svg>

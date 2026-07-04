@@ -7,8 +7,8 @@
 #' \enumerate{
 #'   \item \strong{Compute}: Calculate DER for each parameter using a sandwich
 #'     variance estimator.
-#'   \item \strong{Classify}: Assign parameters to three tiers based on their
-#'     information source and flag those exceeding a threshold.
+#'   \item \strong{Classify}: Assign estimable parameters by information source
+#'     and flag those exceeding a threshold.
 #'   \item \strong{Correct}: Apply selective Cholesky correction to flagged
 #'     parameters only.
 #' }
@@ -16,7 +16,7 @@
 #' @section Core pipeline:
 #' \itemize{
 #'   \item [der_compute()]: Compute DER values.
-#'   \item [der_classify()]: Three-tier classification.
+#'   \item [der_classify()]: Estimable-parameter classification.
 #'   \item [der_correct()]: Selective Cholesky correction.
 #'   \item [der_diagnose()]: All-in-one wrapper.
 #' }
@@ -42,6 +42,12 @@
 #'   \item [nsece_demo]: Synthetic NSECE-like survey data (binomial, J=51).
 #'   \item [sim_hlr]: Balanced hierarchical linear regression (gaussian, J=10).
 #' }
+#'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
 #'
 #' @keywords internal
 "_PACKAGE"

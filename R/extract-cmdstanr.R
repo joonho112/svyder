@@ -50,8 +50,10 @@ extract_draws.CmdStanMCMC <- function(x, ..., pars = NULL) {
 #' @details
 #' \strong{CmdStanMCMC method}: CmdStan does not store model data in the fit
 #' object, so the user must provide all data arguments: \code{y}, \code{X},
-#' \code{group}, \code{weights}, \code{sigma_theta}, and optionally \code{psu},
-#' \code{sigma_e} (for gaussian), \code{beta_prior_sd}, and \code{param_types}.
+#' \code{group}, \code{weights}, \code{cluster}, \code{sigma_theta}, and
+#' optionally \code{strata}, \code{sigma_e} (for gaussian),
+#' \code{normalize}, \code{center_meat}, \code{df_correct},
+#' \code{beta_prior_sd}, and \code{param_types}.
 #'
 #' The draws are extracted from the CmdStanMCMC object using
 #' [extract_draws()] and then passed to the matrix method.
@@ -60,11 +62,27 @@ extract_draws.CmdStanMCMC <- function(x, ..., pars = NULL) {
 #'
 #' @export
 der_compute.CmdStanMCMC <- function(x, ..., y, X, group, weights,
+                                     cluster = NULL, strata = NULL,
                                      psu = NULL, family = "binomial",
                                      sigma_theta, sigma_e = NULL,
-                                     beta_prior_sd = 5,
+                                     normalize = c("unit_mean", "group_size", "none"),
+                                     center_meat = TRUE, df_correct = TRUE,
+                                     beta_prior_sd = Inf,
                                      param_types = NULL,
                                      design = NULL) {
+
+  # --- Deprecated psu alias (resolved here so it is not forwarded) ---
+  if (!is.null(psu)) {
+    if (is.null(cluster)) {
+      warning("'psu' is deprecated; use 'cluster'. ",
+              "Treating psu as the cluster (aggregation unit).",
+              call. = FALSE)
+      cluster <- psu
+    } else {
+      stop("Supply either 'cluster' or the deprecated 'psu', not both.",
+           call. = FALSE)
+    }
+  }
 
   # Extract draws from the CmdStanMCMC object
   extracted <- extract_draws(x)
@@ -77,10 +95,14 @@ der_compute.CmdStanMCMC <- function(x, ..., y, X, group, weights,
     X             = X,
     group         = group,
     weights       = weights,
-    psu           = psu,
+    cluster       = cluster,
+    strata        = strata,
     family        = family,
     sigma_theta   = sigma_theta,
     sigma_e       = sigma_e,
+    normalize     = normalize,
+    center_meat   = center_meat,
+    df_correct    = df_correct,
     beta_prior_sd = beta_prior_sd,
     param_types   = param_types,
     design        = design

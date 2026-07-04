@@ -16,6 +16,7 @@
       X            = fix$X,
       group        = fix$group,
       weights      = fix$w,
+      cluster      = fix$psu,
       family       = "binomial",
       sigma_theta  = fix$sigma_theta_hat,
       param_types  = fix$param_types,
@@ -29,6 +30,7 @@
       X            = fix$X,
       group        = fix$group,
       weights      = fix$w,
+      cluster      = fix$psu,
       family       = "binomial",
       sigma_theta  = fix$sigma_theta_hat,
       param_types  = fix$param_types

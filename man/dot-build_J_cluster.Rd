@@ -2,28 +2,73 @@
 % Please edit documentation in R/sandwich.R
 \name{.build_J_cluster}
 \alias{.build_J_cluster}
-\title{Build the clustered score outer product matrix}
+\title{Build the clustered score outer product matrix (meat)}
 \usage{
-.build_J_cluster(X, r, psu, group, p, J)
+.build_J_cluster(
+  X,
+  r,
+  cluster,
+  group,
+  p,
+  J,
+  strata = NULL,
+  cluster_strata = NULL,
+  center = TRUE,
+  df_correct = TRUE
+)
 }
 \arguments{
 \item{X}{Design matrix (N x p).}
 
-\item{r}{Weighted residuals (length N).}
+\item{r}{Weighted score residuals (length N).}
 
-\item{psu}{Integer PSU indicator (1:G), length N.}
+\item{cluster}{Integer cluster indicator (1:G), length N. This is the
+sandwich aggregation unit (design PSU or model group).}
 
 \item{group}{Integer group indicator (1:J), length N.}
 
 \item{p}{Number of fixed-effect parameters.}
 
 \item{J}{Number of groups.}
+
+\item{strata}{Optional integer stratum indicator (1:H), length N.
+\code{NULL} treats the design as a single stratum.}
+
+\item{cluster_strata}{Optional integer vector giving the stratum of
+every cluster in the declared design universe, indexed by cluster id
+(length G, the universe size). Supplying it declares the cluster
+universe explicitly: cluster ids in \code{1:G} that appear in no
+observation -- e.g., selected PSUs whose second-stage Poisson sample
+is empty -- remain in the meat as zero score-total clusters, entering
+the stratum centering and the C_h/(C_h-1) correction. Without it, the
+universe is inferred from the observed ids, which drops empty
+clusters. Requires \code{strata}.}
+
+\item{center}{Center cluster score totals within strata (default TRUE).}
+
+\item{df_correct}{Apply the C_h / (C_h - 1) stratum correction
+(default TRUE).}
 }
 \value{
 Symmetric (p+J) x (p+J) matrix.
 }
 \description{
-Constructs J_cluster = sum_g s_g s_g^T where s_g is the score vector
-summed within PSU g.
+Constructs the meat matrix from cluster-level score totals. The general
+(default) form is the stratified, centered, DF-corrected estimator
+\deqn{J = \sum_h \frac{C_h}{C_h - 1} \sum_c (t_{hc} - \bar t_h)(t_{hc} - \bar t_h)^\top,}
+where \eqn{t_{hc}} is the score total of cluster \eqn{c} in stratum
+\eqn{h}, \eqn{C_h} the number of clusters in stratum \eqn{h}, and
+\eqn{\bar t_h} the stratum mean of cluster totals. Centering matters at
+the posterior-mean plug-in point because the likelihood score totals do
+not sum to zero there (the prior gradient does not vanish).
+}
+\details{
+With \code{strata = NULL}, \code{center = FALSE}, \code{df_correct = FALSE}
+this reduces to the uncentered single-stratum form
+\eqn{J = \sum_c t_c t_c^\top} used by the v1 pipeline (kept for exact
+reproduction of previously published results).
+
+Strata containing a single cluster cannot be centered; their uncentered
+contribution is used with a warning.
 }
 \keyword{internal}

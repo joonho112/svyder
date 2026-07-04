@@ -191,14 +191,30 @@ test_that("validate_svyder passes on complete object", {
   obj <- structure(
     list(
       der = 1,
-      classification = data.frame(),
+      params = "beta[1]",
+      H_obs = matrix(1),
+      J_cluster = matrix(1),
       V_sand = matrix(1),
       sigma_mcmc = matrix(1),
-      diagnostics = list()
+      classification = data.frame()
     ),
     class = "svyder"
   )
   expect_true(.validate_svyder(obj))
+})
+
+test_that("validate_svyder passes on a real der_compute object", {
+  fix <- make_balanced_gaussian()
+  draws_all <- cbind(fix$draws_beta, fix$draws_theta)
+  result <- der_compute(
+    draws_all,
+    y = fix$y, X = fix$X, group = fix$group,
+    weights = fix$w, cluster = fix$psu,
+    family = "gaussian", sigma_theta = fix$sigma_theta_hat,
+    sigma_e = fix$sigma_e, beta_prior_sd = fix$beta_prior_sd,
+    param_types = fix$param_types
+  )
+  expect_true(.validate_svyder(result))
 })
 
 

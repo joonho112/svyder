@@ -4,7 +4,7 @@
 \alias{tidy.svyder}
 \title{Tidy a svyder Object}
 \usage{
-tidy.svyder(x, ...)
+\method{tidy}{svyder}(x, ...)
 }
 \arguments{
 \item{x}{A \code{svyder} object.}
@@ -18,12 +18,14 @@ A \code{data.frame} with one row per parameter and columns:
 \item{estimate}{Posterior mean (from original draws).}
 \item{std.error}{Posterior standard deviation (from original draws).}
 \item{der}{Design Effect Ratio.}
-\item{tier}{Three-tier classification (if classified).}
+\item{tier}{Design-sensitivity tier (if classified).}
 \item{action}{Action label: \code{"CORRECT"} or \code{"retain"}
 (if classified).}
 \item{flagged}{Logical; whether the parameter is flagged for
 correction (if classified).}
-\item{scale_factor}{Cholesky scale factor applied to this parameter.}
+\item{scale_factor}{Marginal SD ratio recorded for the correction.
+Under \code{method = "block_cholesky"}, this is a reported marginal
+ratio, not a per-parameter scalar transform.}
 }
 }
 \description{
@@ -37,22 +39,28 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
-head(tidy.svyder(result))
+head(tidy(result))
 
+}
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
 }
 \seealso{
 \code{\link[=glance.svyder]{glance.svyder()}} for model-level summaries,
 \code{\link[=print.svyder]{print.svyder()}} for console output.
 
-Other svyder-methods: 
-\code{\link{as.matrix.svyder}()},
-\code{\link{glance.svyder}()},
-\code{\link{is.svyder}()},
-\code{\link{print.svyder}()},
-\code{\link{summary.svyder}()}
+Other svyder-methods:
+\code{\link[=as.matrix.svyder]{as.matrix.svyder()}},
+\code{\link[=glance.svyder]{glance.svyder()}},
+\code{\link[=is.svyder]{is.svyder()}},
+\code{\link[=print.svyder]{print.svyder()}},
+\code{\link[=summary.svyder]{summary.svyder()}}
 }
 \concept{svyder-methods}

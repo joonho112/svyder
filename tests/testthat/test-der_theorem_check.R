@@ -12,7 +12,7 @@
     X = fix$X,
     group = fix$group,
     weights = fix$w,
-    psu = fix$psu,
+    cluster = fix$psu,
     family = fix$family,
     sigma_theta = fix$sigma_theta_hat,
     sigma_e = sigma_e_arg,
@@ -82,8 +82,22 @@ test_that("conservation law attribute present when applicable", {
   cl <- attr(tc, "conservation_law")
   expect_true(!is.null(cl))
   expect_true(is.list(cl))
-  expect_true(all(c("der_mu", "der_theta_mean", "conservation_sum",
-                     "deff_mean", "relative_error") %in% names(cl)))
+  expect_true(all(c("der_mu", "der_theta_cond",
+                    "der_theta_marginal_mean", "der_theta_mean",
+                    "conservation_sum", "deff_mean", "relative_error")
+                  %in% names(cl)))
+  expect_equal(cl$der_theta_cond, mean(sv$B_j * sv$deff_j), tolerance = 1e-12)
+  expect_equal(
+    cl$der_theta_marginal_mean,
+    mean(sv$der[sv$classification$param_type == "re"]),
+    tolerance = 1e-12
+  )
+  expect_equal(cl$der_theta_mean, cl$der_theta_marginal_mean, tolerance = 1e-12)
+  expect_equal(cl$conservation_sum, cl$der_mu + cl$der_theta_cond,
+               tolerance = 1e-12)
+  expect_equal(cl$relative_error,
+               abs(cl$conservation_sum - cl$deff_mean) / cl$deff_mean,
+               tolerance = 1e-12)
 })
 
 

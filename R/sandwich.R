@@ -105,29 +105,88 @@
 }
 
 
-#' Build the clustered score outer product matrix
+#' Build the clustered score outer product matrix (meat)
 #'
-#' Constructs J_cluster = sum_g s_g s_g^T where s_g is the score vector
-#' summed within PSU g.
+#' Constructs the meat matrix from cluster-level score totals. The general
+#' (default) form is the stratified, centered, DF-corrected estimator
+#' \deqn{J = \sum_h \frac{C_h}{C_h - 1} \sum_c (t_{hc} - \bar t_h)(t_{hc} - \bar t_h)^\top,}
+#' where \eqn{t_{hc}} is the score total of cluster \eqn{c} in stratum
+#' \eqn{h}, \eqn{C_h} the number of clusters in stratum \eqn{h}, and
+#' \eqn{\bar t_h} the stratum mean of cluster totals. Centering matters at
+#' the posterior-mean plug-in point because the likelihood score totals do
+#' not sum to zero there (the prior gradient does not vanish).
+#'
+#' With \code{strata = NULL}, \code{center = FALSE}, \code{df_correct = FALSE}
+#' this reduces to the uncentered single-stratum form
+#' \eqn{J = \sum_c t_c t_c^\top} used by the v1 pipeline (kept for exact
+#' reproduction of previously published results).
+#'
+#' Strata containing a single cluster cannot be centered; their uncentered
+#' contribution is used with a warning.
 #'
 #' @param X Design matrix (N x p).
-#' @param r Weighted residuals (length N).
-#' @param psu Integer PSU indicator (1:G), length N.
+#' @param r Weighted score residuals (length N).
+#' @param cluster Integer cluster indicator (1:G), length N. This is the
+#'   sandwich aggregation unit (design PSU or model group).
 #' @param group Integer group indicator (1:J), length N.
 #' @param p Number of fixed-effect parameters.
 #' @param J Number of groups.
+#' @param strata Optional integer stratum indicator (1:H), length N.
+#'   \code{NULL} treats the design as a single stratum.
+#' @param cluster_strata Optional integer vector giving the stratum of
+#'   every cluster in the declared design universe, indexed by cluster id
+#'   (length G, the universe size). Supplying it declares the cluster
+#'   universe explicitly: cluster ids in \code{1:G} that appear in no
+#'   observation -- e.g., selected PSUs whose second-stage Poisson sample
+#'   is empty -- remain in the meat as zero score-total clusters, entering
+#'   the stratum centering and the C_h/(C_h-1) correction. Without it, the
+#'   universe is inferred from the observed ids, which drops empty
+#'   clusters. Requires \code{strata}.
+#' @param center Center cluster score totals within strata (default TRUE).
+#' @param df_correct Apply the C_h / (C_h - 1) stratum correction
+#'   (default TRUE).
 #'
 #' @return Symmetric (p+J) x (p+J) matrix.
 #'
 #' @keywords internal
-.build_J_cluster <- function(X, r, psu, group, p, J) {
+.build_J_cluster <- function(X, r, cluster, group, p, J,
+                             strata = NULL, cluster_strata = NULL,
+                             center = TRUE, df_correct = TRUE) {
 
   d <- p + J
-  G <- max(psu)
-  J_cluster <- matrix(0, d, d)
+  G <- if (!is.null(cluster_strata)) length(cluster_strata) else max(cluster)
 
+  # --- Cluster-to-stratum map (each cluster must lie in one stratum) ---
+  if (!is.null(cluster_strata)) {
+    if (is.null(strata)) {
+      stop("'cluster_strata' requires 'strata'.", call. = FALSE)
+    }
+    if (any(cluster < 1L | cluster > G)) {
+      stop("With 'cluster_strata', cluster ids must lie in 1:length(cluster_strata).",
+           call. = FALSE)
+    }
+    strata_of_cluster <- as.integer(cluster_strata)
+    bad <- strata != strata_of_cluster[cluster]
+    if (any(bad)) {
+      stop(sprintf(
+        "'strata' disagrees with 'cluster_strata' at %d observation(s).",
+        sum(bad)), call. = FALSE)
+    }
+  } else if (is.null(strata)) {
+    strata_of_cluster <- rep(1L, G)
+  } else {
+    tab <- unique(data.frame(cluster = cluster, strata = strata))
+    if (nrow(tab) != G) {
+      stop("Each cluster must belong to exactly one stratum.", call. = FALSE)
+    }
+    strata_of_cluster <- integer(G)
+    strata_of_cluster[tab$cluster] <- tab$strata
+  }
+
+  # --- Cluster-level score totals: T is G x d ---
+  T_mat <- matrix(0, G, d)
   for (g in seq_len(G)) {
-    idx_g <- which(psu == g)
+    idx_g <- which(cluster == g)
     if (length(idx_g) == 0L) next
 
     s_g <- numeric(d)
@@ -139,13 +198,39 @@
       s_g[1:p] <- colSums(X[idx_g, , drop = FALSE] * r[idx_g])
     }
 
-    # Theta score component: accumulate within each group present in PSU g
-    for (j_state in unique(group[idx_g])) {
-      idx_gj <- idx_g[group[idx_g] == j_state]
-      s_g[p + j_state] <- s_g[p + j_state] + sum(r[idx_gj])
+    # Theta score component: accumulate within each group present in cluster g
+    for (j_grp in unique(group[idx_g])) {
+      idx_gj <- idx_g[group[idx_g] == j_grp]
+      s_g[p + j_grp] <- s_g[p + j_grp] + sum(r[idx_gj])
     }
 
-    J_cluster <- J_cluster + tcrossprod(s_g)
+    T_mat[g, ] <- s_g
+  }
+
+  # --- Stratum-wise (centered, DF-corrected) accumulation ---
+  J_cluster <- matrix(0, d, d)
+  singleton_strata <- 0L
+
+  for (h in unique(strata_of_cluster)) {
+    idx_h <- which(strata_of_cluster == h)
+    C_h   <- length(idx_h)
+    T_h   <- T_mat[idx_h, , drop = FALSE]
+
+    if (center && C_h > 1L) {
+      T_h <- sweep(T_h, 2L, colMeans(T_h))
+    } else if (center && C_h == 1L) {
+      singleton_strata <- singleton_strata + 1L
+    }
+
+    mult <- if (df_correct && C_h > 1L) C_h / (C_h - 1) else 1
+    J_cluster <- J_cluster + mult * crossprod(T_h)
+  }
+
+  if (singleton_strata > 0L) {
+    warning(sprintf(
+      "%d stratum/strata contain a single cluster; their contribution is uncentered.",
+      singleton_strata
+    ), call. = FALSE)
   }
 
   # Symmetrize

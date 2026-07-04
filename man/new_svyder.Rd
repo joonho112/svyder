@@ -22,7 +22,10 @@ new_svyder(
   family,
   n_obs,
   n_groups,
-  compute_time
+  compute_time,
+  target = NULL,
+  excluded = NULL,
+  data = NULL
 )
 }
 \arguments{
@@ -48,7 +51,8 @@ new_svyder(
 
 \item{corrected_draws}{Numeric matrix, corrected posterior draws (M x d).}
 
-\item{scale_factors}{Numeric vector of Cholesky scale factors (length d).}
+\item{scale_factors}{Numeric vector of marginal SD ratios recorded for
+correction reporting (length d).}
 
 \item{original_draws}{Numeric matrix, original posterior draws (M x d).}
 
@@ -61,6 +65,15 @@ new_svyder(
 \item{n_groups}{Integer, number of groups/clusters.}
 
 \item{compute_time}{Numeric scalar, computation time in seconds.}
+
+\item{target}{List describing the declared variance target (aggregation
+unit, strata, meat options, weight convention, bread convention).}
+
+\item{excluded}{Data frame of Tier III parameters excluded from the DER
+diagnostic (hyperparameters), with reasons.}
+
+\item{data}{List of data slots retained for re-targeting and structural
+decomposition (X, group, weights, cluster, strata, v, r).}
 }
 \value{
 A list of class \code{"svyder"}.

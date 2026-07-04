@@ -1,9 +1,14 @@
 bibentry(
   bibtype = "Article",
   title = "Design Effect Ratios for Bayesian Survey Models: A Diagnostic Framework for Identifying Survey-Sensitive Parameters",
-  author = person("JoonHo", "Lee"),
-  journal = "arXiv preprint",
-  year = "2026"
+  author = c(
+    person("JoonHo", "Lee"),
+    person("Matthew R.", "Williams"),
+    person("Terrance D.", "Savitsky")
+  ),
+  journal = "Journal of Survey Statistics and Methodology",
+  year = "2026",
+  note = "Submitted"
 )
 
 bibentry(

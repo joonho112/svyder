@@ -19,13 +19,19 @@ der_compute(x, ...)
   X,
   group,
   weights,
-  psu = NULL,
+  cluster,
+  strata = NULL,
+  cluster_strata = NULL,
   family = "binomial",
   sigma_theta,
   sigma_e = NULL,
-  beta_prior_sd = 5,
+  normalize = c("unit_mean", "group_size", "none"),
+  center_meat = TRUE,
+  df_correct = TRUE,
+  beta_prior_sd = Inf,
   param_types = NULL,
-  design = NULL
+  design = NULL,
+  psu = NULL
 )
 
 \method{der_compute}{default}(x, ...)
@@ -35,11 +41,16 @@ der_compute(x, ...)
   ...,
   weights,
   group = NULL,
+  cluster = NULL,
+  strata = NULL,
   psu = NULL,
   family = NULL,
   sigma_theta = NULL,
   sigma_e = NULL,
-  beta_prior_sd = 5,
+  normalize = c("unit_mean", "group_size", "none"),
+  center_meat = TRUE,
+  df_correct = TRUE,
+  beta_prior_sd = Inf,
   param_types = NULL,
   design = NULL
 )
@@ -51,11 +62,16 @@ der_compute(x, ...)
   X,
   group,
   weights,
+  cluster = NULL,
+  strata = NULL,
   psu = NULL,
   family = "binomial",
   sigma_theta,
   sigma_e = NULL,
-  beta_prior_sd = 5,
+  normalize = c("unit_mean", "group_size", "none"),
+  center_meat = TRUE,
+  df_correct = TRUE,
+  beta_prior_sd = Inf,
   param_types = NULL,
   design = NULL
 )
@@ -64,10 +80,15 @@ der_compute(x, ...)
   x,
   ...,
   weights,
+  cluster = NULL,
+  strata = NULL,
   psu = NULL,
   sigma_theta = NULL,
   sigma_e = NULL,
-  beta_prior_sd = 5,
+  normalize = c("unit_mean", "group_size", "none"),
+  center_meat = TRUE,
+  df_correct = TRUE,
+  beta_prior_sd = Inf,
   param_types = NULL,
   design = NULL
 )
@@ -87,51 +108,105 @@ For the matrix method, columns 1:p are fixed effects and columns
 
 \item{weights}{Survey weights (positive, length N).}
 
-\item{psu}{PSU indicators (default: same as group).}
+\item{cluster}{Sandwich aggregation unit (length N). \strong{Required}
+(unless supplied via \code{design}): pass the design PSU ids for a
+design-based target or \code{group} for a model-aligned target.}
+
+\item{strata}{Optional stratum indicator (length N).}
+
+\item{cluster_strata}{Optional vector giving the stratum of \emph{every}
+cluster in the declared design universe, indexed by cluster id (length
+G, the universe size). Supplying it declares the cluster universe
+explicitly, so cluster ids with no sampled observations -- selected
+PSUs whose second-stage (e.g., Poisson) sample is empty -- enter the
+meat as zero score-total clusters, contributing to the stratum
+centering and the \eqn{C_h/(C_h-1)} correction rather than silently
+vanishing from the target. When supplied, \code{cluster} must contain
+integer ids in \code{1:length(cluster_strata)} and \code{strata} is
+required. Leave \code{NULL} when every cluster of the realized design
+has at least one observation (e.g., the NSECE application).}
 
 \item{family}{Model family: \code{"binomial"} or \code{"gaussian"}.}
 
-\item{sigma_theta}{Estimated random effect SD.}
+\item{sigma_theta}{Estimated random effect SD (plug-in).}
 
 \item{sigma_e}{Residual SD (gaussian only).}
 
-\item{beta_prior_sd}{Prior SD for fixed effects (default: 5).}
+\item{normalize}{Weight convention: \code{"unit_mean"} (default),
+\code{"group_size"}, or \code{"none"}. Recorded in the result.}
+
+\item{center_meat}{Center cluster score totals within strata
+(default \code{TRUE}). Set \code{FALSE} only to reproduce v1 results.}
+
+\item{df_correct}{Apply the \eqn{C_h/(C_h-1)} stratum correction
+(default \code{TRUE}). Set \code{FALSE} only to reproduce v1 results.}
+
+\item{beta_prior_sd}{Prior SD for fixed effects in the bread
+(default \code{Inf} = diffuse-beta convention, no ridge).}
 
 \item{param_types}{Character vector of length p: \code{"fe_within"} or
-\code{"fe_between"}.}
+\code{"fe_between"}. If \code{NULL}, types are inferred from the design
+matrix (columns constant within every group are \code{"fe_between"})
+and the inference is reported via a message.}
 
-\item{design}{A \code{survey.design2} object (alternative to weights/psu).}
+\item{design}{A \code{survey.design2} object; supplies \code{weights},
+\code{cluster} (first-stage), and \code{strata} (first-stage).}
+
+\item{psu}{Deprecated alias for \code{cluster}.}
 }
 \value{
-A \code{svyder} object containing DER values, sandwich matrices,
-per-group diagnostics, and original posterior draws.
+A \code{svyder} object (a structured list) with, among others:
+\describe{
+\item{der}{Named numeric vector of Design Effect Ratios, one per
+parameter (\code{beta[1..p]} then \code{theta[1..J]}).}
+\item{V_sand}{Sandwich (declared-target) variance matrix
+\eqn{H^{-1} J_c H^{-1}} (\eqn{d \times d}).}
+\item{sigma_mcmc}{Model-based MCMC posterior covariance
+(\eqn{d \times d}); \code{der} is its diagonal ratio to
+\code{V_sand}.}
+\item{target}{List recording the declared variance target: number of
+clusters, strata, centering / DF-correction flags, weight
+convention, and bread convention.}
+\item{excluded}{Data frame of Tier III parameters (hyperparameters)
+excluded from the DER diagnostic, with reasons.}
+\item{data}{List of data slots (\code{X}, \code{group}, \code{weights},
+\code{cluster}, \code{strata}, working weights \code{v}, score
+residuals \code{r}) retained for re-targeting and decomposition.}
+\item{classification}{Data frame with one row per parameter
+(\code{param_name}, \code{param_type}, \code{der}); tiers are filled
+in by \code{\link[=der_classify]{der_classify()}}.}
+\item{deff_j, B_j}{Per-group Kish design effects and shrinkage factors
+(length J).}
+}
 }
 \description{
 Computes Design Effect Ratios (DER) for each parameter in a Bayesian
-hierarchical model fitted to complex survey data. The DER measures how
-much each parameter's posterior variance should change when the survey
-design is properly accounted for.
+hierarchical model fitted to complex survey data. The DER of a parameter
+is the ratio of its design-based sandwich variance -- computed for a
+\emph{declared variance target} -- to its model-based MCMC posterior
+variance. Values substantially above 1 indicate that the posterior
+understates design-based uncertainty; values at or below 1 indicate that
+correction is unnecessary (and typically harmful).
 }
 \details{
-DER is defined as the ratio of the sandwich variance (which accounts for
-survey design) to the naive MCMC posterior variance. Values near 1 indicate
-that the posterior is already well-calibrated; values substantially above 1
-indicate underestimation of uncertainty.
-
 \strong{brmsfit method}: The brms method auto-detects the response vector
 \code{y}, design matrix \code{X}, grouping variable \code{group}, model
 \code{family}, and random effect SD \code{sigma_theta} from the fitted
 model object. The user must provide \code{weights} (survey weights) and
-optionally \code{psu} (primary sampling unit indicators), since these are
-not stored in brms fit objects.
+\code{cluster} (the sandwich aggregation unit), since these are not
+stored in brms fit objects. \code{strata}, \code{normalize},
+\code{center_meat}, and \code{df_correct} are passed through to the
+matrix method.
 
 The \code{group} argument can optionally be provided to override auto-detection
 from the random effects structure.
 
 \strong{CmdStanMCMC method}: CmdStan does not store model data in the fit
 object, so the user must provide all data arguments: \code{y}, \code{X},
-\code{group}, \code{weights}, \code{sigma_theta}, and optionally \code{psu},
-\code{sigma_e} (for gaussian), \code{beta_prior_sd}, and \code{param_types}.
+\code{group}, \code{weights}, \code{cluster}, \code{sigma_theta}, and
+optionally \code{strata}, \code{sigma_e} (for gaussian),
+\code{normalize}, \code{center_meat}, \code{df_correct},
+\code{beta_prior_sd}, and \code{param_types}.
 
 The draws are extracted from the CmdStanMCMC object using
 \code{\link[=extract_draws]{extract_draws()}} and then passed to the matrix method.
@@ -142,29 +217,85 @@ The draws matrix must have columns ordered as
 vector \code{y}, design matrix \code{X}, grouping variable \code{group},
 model \code{family}, random effect SD \code{sigma_theta}, and residual SD
 \code{sigma_e} (for gaussian) from the fitted model object. The user must
-provide \code{weights} (survey weights) and optionally \code{psu} (primary
-sampling unit indicators).
+provide \code{weights} (survey weights) and \code{cluster} (the sandwich
+aggregation unit); \code{strata}, \code{normalize}, \code{center_meat},
+and \code{df_correct} are passed through to the matrix method.
 }
+\section{The declared variance target}{
+
+The sandwich variance is not unique: it depends on choices that are part
+of the estimand, not implementation details. \code{der_compute()} therefore
+requires them explicitly and records them in the returned object:
+\itemize{
+\item \code{cluster} -- the aggregation unit of the score outer product
+(the design PSU for a design-based target, or the model group for a
+model-aligned target). There is no default: DER values can change
+materially between the two (in the NSECE application the flagged set
+moves from 1 of 54 to 28 of 54, including 27 of the 51 state
+effects).
+\item \code{strata} -- optional design strata; cluster totals are
+centered within strata and a \eqn{C_h/(C_h-1)} correction is applied.
+\item \code{normalize} -- the survey-weight convention. Random-effect
+DERs are not invariant to weight rescaling, so the convention is part
+of the target. \code{"unit_mean"} (default) rescales weights to mean 1
+overall; \code{"group_size"} rescales within each group to sum to the
+group size; \code{"none"} uses the weights as supplied.
+}
+}
+
+\section{The bread}{
+
+The bread is the penalized (posterior) Hessian at the posterior mean: the
+pseudo-likelihood curvature plus the random-effect prior precision
+\eqn{1/\sigma_\theta^2}. The likelihood-only Hessian is singular for any
+model with an intercept and a full set of group effects, so the prior term
+is what makes the sandwich well-defined. By the diffuse-beta convention
+the fixed-effect prior contributes no curvature by default
+(\code{beta_prior_sd = Inf}); supply a finite value to reproduce pipelines
+that used an informative beta prior in the bread.
+}
+
 \examples{
 data(nsece_demo)
 result <- der_compute(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
 print(result)
 
 }
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
+
+Savitsky, T. D., & Williams, M. R. (2022). Pseudo Bayesian mixed models
+under informative sampling. \emph{Journal of Official Statistics}, 38(4),
+901--928. \doi{10.2478/jos-2022-0039}
+
+Williams, M. R., & Savitsky, T. D. (2021). Uncertainty estimation for
+pseudo-Bayesian inference under complex sampling. \emph{International
+Statistical Review}, 89(1), 72--107. \doi{10.1111/insr.12376}
+
+Binder, D. A. (1983). On the variances of asymptotically normal estimators
+from complex surveys. \emph{International Statistical Review}, 51(3),
+279--292. \doi{10.2307/1402588}
+
+Kish, L. (1965). \emph{Survey Sampling}. John Wiley & Sons.
+}
 \seealso{
 \code{\link[=der_classify]{der_classify()}} for classification, \code{\link[=der_correct]{der_correct()}} for
-correction, \code{\link[=der_diagnose]{der_diagnose()}} for the all-in-one pipeline.
+correction, \code{\link[=der_compare]{der_compare()}} for comparing targets,
+\code{\link[=der_diagnose]{der_diagnose()}} for the all-in-one pipeline.
 
-Other core-pipeline: 
-\code{\link{der_classify}()},
-\code{\link{der_correct}()},
-\code{\link{der_diagnose}()}
+Other core-pipeline:
+\code{\link[=der_classify]{der_classify()}},
+\code{\link[=der_correct]{der_correct()}},
+\code{\link[=der_diagnose]{der_diagnose()}}
 }
 \concept{core-pipeline}

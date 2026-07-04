@@ -7,32 +7,63 @@
 der_decompose(x)
 }
 \arguments{
-\item{x}{A \code{svyder} object.}
+\item{x}{A \code{svyder} object from svyder >= 0.2.0 (the stored
+\code{$data} slots are required).}
 }
 \value{
-A \code{data.frame} with columns: \code{param}, \code{param_type},
-\code{der}, \code{deff_mean}, \code{B_mean}, \code{R_k}, \code{kappa},
-\code{der_predicted}.
+A \code{data.frame} with one row per parameter and columns:
+\describe{
+\item{param}{Parameter name.}
+\item{param_type}{\code{"fe_within"}, \code{"fe_between"}, or
+\code{"re"}.}
+\item{der}{Observed Design Effect Ratio.}
+\item{deff_used}{Design effect entering the prediction: the global
+Kish DEFF for fixed effects, the per-group \eqn{\mathrm{DEFF}_j} for
+random effects.}
+\item{B_used}{Shrinkage factor \eqn{B_j} (random-effect rows only;
+\code{NA} for fixed effects).}
+\item{R_k}{Structural between-group share of covariate \eqn{k}'s
+identifying variation (fixed-effect rows only; \code{NA} for random
+effects).}
+\item{kappa}{Finite-group correction \eqn{\kappa_j} (random-effect
+rows only; \code{NA} for fixed effects).}
+\item{der_predicted}{Theorem-based prediction: \eqn{\mathrm{DEFF}\,
+      (1 - R_k)} for fixed effects (Theorem 1),
+\eqn{B_j\,\mathrm{DEFF}_j\,\kappa_j} for random effects (Theorem 2).}
+}
 }
 \description{
-Decomposes each parameter's DER into its constituent factors:
-Kish DEFF, shrinkage factor B, protection factor R_k, and
-finite-J correction kappa. This decomposition reveals why each
-parameter has its observed DER value.
+Decomposes each parameter's DER into its constituent factors. For fixed
+effects, the protection factor \eqn{R_k} is computed structurally from
+the working-weighted within/between split of covariate \eqn{k}'s
+identifying variation:
+\deqn{R_k = \frac{\sum_j B_j\, a_j \bar x_{jk}^2}
+                 {\sum_j (W_{jkk} + a_j \bar x_{jk}^2)},}
+where \eqn{a_j} is the working information of group \eqn{j},
+\eqn{\bar x_{jk}} the working-weighted group mean of covariate \eqn{k},
+and \eqn{W_{jkk}} its within-group working sum of squares. A pure
+within-group covariate has \eqn{R_k = 0}; a pure between-group covariate
+has \eqn{R_k} equal to the information-weighted average shrinkage factor.
+The prediction is \eqn{DER_k \approx DEFF \cdot (1 - R_k)} with the
+global Kish DEFF.
 }
 \details{
-For fixed effects:
-\itemize{
-\item \code{fe_within}: DER \eqn{\approx}{~} DEFF \eqn{\cdot}{*} (1 - R_k),
-where R_k \eqn{\approx}{~} 0.
-\item \code{fe_between}: DER \eqn{\approx}{~} DEFF \eqn{\cdot}{*} (1 - R_k),
-where R_k \eqn{\approx}{~} B.
-}
+For random effects the per-group prediction
+\eqn{DER_j \approx B_j \cdot DEFF_j \cdot \kappa_j} is used (matching
+\code{\link[=der_theorem_check]{der_theorem_check()}}), not a pooled mean.
 
-For random effects:
-\itemize{
-\item DER \eqn{\approx}{~} B \eqn{\cdot}{*} DEFF \eqn{\cdot}{*} kappa(J).
-}
+Because \code{der_predicted} is structural, comparing it with the
+observed \code{der} is a genuine check of the decomposition theorems'
+mechanism, within their stated model class.
+
+The prediction is row-specific: \code{der_predicted} uses Theorem 1
+(\eqn{\mathrm{DEFF}\cdot(1 - R_k)}) for fixed-effect rows and Theorem 2
+(\eqn{B_j\cdot\mathrm{DEFF}_j\cdot\kappa_j}) for random-effect rows.
+Consequently the component columns are populated per row type:
+\code{B_used} and \code{kappa} are \code{NA} for fixed effects (whose
+prediction uses only DEFF and \eqn{R_k}), and \code{R_k} is \code{NA} for
+random effects (whose prediction uses only \eqn{B_j}, \eqn{\mathrm{DEFF}_j}
+and \eqn{\kappa_j}).
 }
 \examples{
 data(nsece_demo)
@@ -40,7 +71,7 @@ result <- der_diagnose(
   nsece_demo$draws,
   y = nsece_demo$y, X = nsece_demo$X,
   group = nsece_demo$group, weights = nsece_demo$weights,
-  psu = nsece_demo$psu, family = "binomial",
+  cluster = nsece_demo$psu, family = "binomial",
   sigma_theta = nsece_demo$sigma_theta,
   param_types = nsece_demo$param_types
 )
@@ -48,13 +79,26 @@ decomp <- der_decompose(result)
 head(decomp)
 
 }
+\references{
+Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+for Bayesian Survey Models: A Diagnostic Framework for Identifying
+Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+Methodology}. Submitted.
+
+Kish, L. (1965). \emph{Survey Sampling}. John Wiley & Sons.
+
+Fay, R. E., & Herriot, R. A. (1979). Estimates of income for small places:
+An application of James--Stein procedures to census data. \emph{Journal of
+the American Statistical Association}, 74(366), 269--277.
+\doi{10.1080/01621459.1979.10482505}
+}
 \seealso{
-\code{\link[=der_theorem_check]{der_theorem_check()}} for verifying theoretical predictions,
+\code{\link[=der_theorem_check]{der_theorem_check()}} for theorem-level comparison,
 \code{\link[=plot.svyder]{plot.svyder()}} with \code{type = "decomposition"} for visualization.
 
-Other analysis: 
-\code{\link{der_compare}()},
-\code{\link{der_sensitivity}()},
-\code{\link{der_theorem_check}()}
+Other analysis:
+\code{\link[=der_compare]{der_compare()}},
+\code{\link[=der_sensitivity]{der_sensitivity()}},
+\code{\link[=der_theorem_check]{der_theorem_check()}}
 }
 \concept{analysis}

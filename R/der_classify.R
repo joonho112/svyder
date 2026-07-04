@@ -7,8 +7,9 @@
 
 #' Classify Parameters by Design Sensitivity
 #'
-#' Assigns each parameter to a design-sensitivity tier and flags those
-#' whose DER exceeds the threshold \code{tau}. The three-tier classification:
+#' Assigns each estimable parameter to a design-sensitivity tier and flags those
+#' whose DER exceeds the threshold \code{tau}. The estimable-parameter
+#' classification:
 #' \itemize{
 #'   \item \strong{Tier I-a} (\code{fe_within}): Survey-dominated parameters.
 #'   \item \strong{Tier I-b} (\code{fe_between}): Protected between-cluster parameters.
@@ -18,12 +19,36 @@
 #' Parameters with DER > \code{tau} (strict inequality) are flagged for
 #' correction, regardless of tier.
 #'
+#' @section Tier DER signatures:
+#' Each tier has a closed-form DER signature under the decomposition theorems
+#' (with \eqn{B} the shrinkage factor, \eqn{J} the number of groups):
+#' \itemize{
+#'   \item \strong{Tier I-a} (within-group fixed effects):
+#'     \eqn{\mathrm{DER} = \mathrm{DEFF}} -- fully exposed to the design and
+#'     the primary correction candidates.
+#'   \item \strong{Tier I-b} (between-group fixed effects):
+#'     \eqn{\mathrm{DER} = \mathrm{DEFF}\,(1 - B)} -- shielded by shrinkage
+#'     and usually below the threshold.
+#'   \item \strong{Tier II} (random effects):
+#'     \eqn{\mathrm{DER} = B\cdot\mathrm{DEFF}\cdot\kappa(J)}, with the
+#'     finite-group correction \eqn{\kappa(J) = 1 - 1/[J(1-B)+B]}.
+#'   \item \strong{Tier III} (hyperparameters, e.g. \eqn{\sigma_\theta}):
+#'     excluded by construction because they are outside the declared
+#'     location-block DER target. Reported in \code{$excluded}, never flagged.
+#' }
+#'
 #' @param x A \code{svyder} object from [der_compute()].
 #' @param tau Threshold (default 1.2). Parameters with DER > tau are flagged.
 #' @param verbose Print classification summary (default \code{TRUE}).
 #'
 #' @return A \code{svyder} object with updated \code{classification} and
 #'   \code{tau} fields.
+#'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
 #'
 #' @seealso [der_compute()] for computing DER values, [der_correct()] for
 #'   applying corrections, [der_diagnose()] for the all-in-one pipeline.
@@ -35,7 +60,7 @@
 #'   nsece_demo$draws,
 #'   y = nsece_demo$y, X = nsece_demo$X,
 #'   group = nsece_demo$group, weights = nsece_demo$weights,
-#'   psu = nsece_demo$psu, family = "binomial",
+#'   cluster = nsece_demo$psu, family = "binomial",
 #'   sigma_theta = nsece_demo$sigma_theta,
 #'   param_types = nsece_demo$param_types
 #' )
@@ -104,6 +129,10 @@ der_classify <- function(x, tau = 1.2, verbose = TRUE) {
     n_flagged <- sum(flagged)
     cat(sprintf("DER Classification (tau = %.2f)\n", tau))
     cat(sprintf("  Total parameters: %d\n", d))
+    if (!is.null(x$excluded) && nrow(x$excluded) > 0L) {
+      cat(sprintf("  Tier III excluded (DER undefined): %s\n",
+                  paste(x$excluded$param, collapse = ", ")))
+    }
     cat(sprintf("  Flagged: %d (%s)\n", n_flagged, .format_pct(n_flagged / d)))
 
     if (n_flagged > 0) {

@@ -162,7 +162,7 @@ test_that("J_cluster is symmetric for balanced gaussian", {
   r <- fix$w * (fix$y - fix$mu) / fix$sigma_e^2
 
   Jc <- svyder:::.build_J_cluster(
-    X = fix$X, r = r, psu = fix$psu, group = fix$group,
+    X = fix$X, r = r, cluster = fix$psu, group = fix$group,
     p = fix$p, J = fix$J
   )
 
@@ -177,7 +177,7 @@ test_that("J_cluster is symmetric for unbalanced binomial", {
   r <- fix$w * (fix$y - fix$mu)
 
   Jc <- svyder:::.build_J_cluster(
-    X = fix$X, r = r, psu = fix$psu, group = fix$group,
+    X = fix$X, r = r, cluster = fix$psu, group = fix$group,
     p = fix$p, J = fix$J
   )
 
@@ -189,7 +189,7 @@ test_that("J_cluster is positive semi-definite", {
   r <- fix$w * (fix$y - fix$mu) / fix$sigma_e^2
 
   Jc <- svyder:::.build_J_cluster(
-    X = fix$X, r = r, psu = fix$psu, group = fix$group,
+    X = fix$X, r = r, cluster = fix$psu, group = fix$group,
     p = fix$p, J = fix$J
   )
 
@@ -198,22 +198,170 @@ test_that("J_cluster is positive semi-definite", {
               info = "J_cluster eigenvalues must be non-negative (PSD)")
 })
 
-test_that("J_cluster handles single-observation PSUs", {
-  # Each observation is its own PSU
+test_that("J_cluster handles single-observation clusters (legacy flags)", {
+  # Each observation is its own cluster; the v1 uncentered form gives
+  # J_cluster[1,1] = sum(r^2) for an intercept-only beta block.
   set.seed(99)
   J <- 2L; p <- 1L; N <- 10L
   X <- matrix(1, N, p)
   r <- rnorm(N)
   group <- rep(seq_len(J), each = N / J)
-  psu <- seq_len(N)  # each obs is its own PSU
+  cluster <- seq_len(N)  # each obs is its own cluster
 
-  Jc <- svyder:::.build_J_cluster(X, r, psu, group, p, J)
+  Jc <- svyder:::.build_J_cluster(X, r, cluster, group, p, J,
+                                  strata = NULL, center = FALSE,
+                                  df_correct = FALSE)
 
   expect_equal(Jc, t(Jc), tolerance = 1e-12)
-  # With single-obs PSUs, J_cluster should equal sum of r_i^2 x_i x_i^T
-  # for the beta block
   expect_equal(Jc[1, 1], sum(r^2), tolerance = 1e-10,
-               info = "Single-obs PSUs: J_cluster[1,1] = sum(r^2)")
+               info = "Single-obs clusters, uncentered: J_cluster[1,1] = sum(r^2)")
+})
+
+test_that("legacy flags reproduce the uncentered single-stratum estimator", {
+  # Small fixture: p=1, J=2, G=4 clusters of unequal size
+  set.seed(7)
+  N <- 12L; p <- 1L; J <- 2L
+  X <- matrix(1, N, p)
+  r <- rnorm(N)
+  group   <- rep(1:2, each = 6)
+  cluster <- c(1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 4)
+
+  Jc <- svyder:::.build_J_cluster(X, r, cluster, group, p, J,
+                                  strata = NULL, center = FALSE,
+                                  df_correct = FALSE)
+
+  # Hand computation of the v1 estimator: sum_g t_g t_g'
+  d <- p + J
+  J_hand <- matrix(0, d, d)
+  for (g in 1:4) {
+    idx <- which(cluster == g)
+    t_g <- numeric(d)
+    t_g[1] <- sum(r[idx])                       # intercept score
+    for (j in unique(group[idx])) {
+      t_g[p + j] <- sum(r[idx[group[idx] == j]])
+    }
+    J_hand <- J_hand + tcrossprod(t_g)
+  }
+  J_hand <- (J_hand + t(J_hand)) / 2
+
+  expect_equal(Jc, J_hand, tolerance = 1e-12)
+})
+
+test_that("centered single-stratum meat equals G/(G-1) * crossprod of swept totals", {
+  set.seed(11)
+  N <- 20L; p <- 1L; J <- 2L; G <- 5L
+  X <- matrix(1, N, p)
+  r <- rnorm(N)
+  group   <- rep(1:2, each = 10)
+  cluster <- rep(1:G, each = 4)
+
+  Jc <- svyder:::.build_J_cluster(X, r, cluster, group, p, J,
+                                  strata = NULL, center = TRUE,
+                                  df_correct = TRUE)
+
+  # Hand computation: cluster totals, centered, DF-corrected
+  d <- p + J
+  T_mat <- matrix(0, G, d)
+  for (g in seq_len(G)) {
+    idx <- which(cluster == g)
+    T_mat[g, 1] <- sum(r[idx])
+    for (j in unique(group[idx])) {
+      T_mat[g, p + j] <- sum(r[idx[group[idx] == j]])
+    }
+  }
+  T_c    <- sweep(T_mat, 2L, colMeans(T_mat))
+  J_hand <- (G / (G - 1)) * crossprod(T_c)
+  J_hand <- (J_hand + t(J_hand)) / 2
+
+  expect_equal(Jc, J_hand, tolerance = 1e-12)
+})
+
+test_that("two-strata meat matches the stratum-wise hand computation", {
+  set.seed(13)
+  N <- 24L; p <- 1L; J <- 2L
+  X <- matrix(1, N, p)
+  r <- rnorm(N)
+  group   <- rep(1:2, each = 12)
+  # Stratum 1: clusters 1-3 (obs 1-12); stratum 2: clusters 4-6 (obs 13-24)
+  cluster <- rep(1:6, each = 4)
+  strata  <- rep(1:2, each = 12)
+
+  Jc <- svyder:::.build_J_cluster(X, r, cluster, group, p, J,
+                                  strata = strata, center = TRUE,
+                                  df_correct = TRUE)
+
+  # Hand computation stratum by stratum
+  d <- p + J
+  T_mat <- matrix(0, 6, d)
+  for (g in 1:6) {
+    idx <- which(cluster == g)
+    T_mat[g, 1] <- sum(r[idx])
+    for (j in unique(group[idx])) {
+      T_mat[g, p + j] <- sum(r[idx[group[idx] == j]])
+    }
+  }
+  J_hand <- matrix(0, d, d)
+  for (h in 1:2) {
+    rows <- if (h == 1) 1:3 else 4:6
+    C_h  <- length(rows)
+    T_h  <- sweep(T_mat[rows, , drop = FALSE], 2L,
+                  colMeans(T_mat[rows, , drop = FALSE]))
+    J_hand <- J_hand + (C_h / (C_h - 1)) * crossprod(T_h)
+  }
+  J_hand <- (J_hand + t(J_hand)) / 2
+
+  expect_equal(Jc, J_hand, tolerance = 1e-12)
+})
+
+test_that("singleton stratum triggers a warning and enters uncentered", {
+  set.seed(17)
+  N <- 12L; p <- 1L; J <- 2L
+  X <- matrix(1, N, p)
+  r <- rnorm(N)
+  group   <- rep(1:2, each = 6)
+  # Stratum 1 has clusters 1-2; stratum 2 has ONLY cluster 3 (singleton)
+  cluster <- rep(1:3, each = 4)
+  strata  <- c(rep(1L, 8), rep(2L, 4))
+
+  expect_warning(
+    Jc <- svyder:::.build_J_cluster(X, r, cluster, group, p, J,
+                                    strata = strata, center = TRUE,
+                                    df_correct = TRUE),
+    "single cluster"
+  )
+
+  # Hand computation: stratum 1 centered + DF-corrected, stratum 2 uncentered
+  d <- p + J
+  T_mat <- matrix(0, 3, d)
+  for (g in 1:3) {
+    idx <- which(cluster == g)
+    T_mat[g, 1] <- sum(r[idx])
+    for (j in unique(group[idx])) {
+      T_mat[g, p + j] <- sum(r[idx[group[idx] == j]])
+    }
+  }
+  T_1 <- sweep(T_mat[1:2, , drop = FALSE], 2L,
+               colMeans(T_mat[1:2, , drop = FALSE]))
+  J_hand <- 2 * crossprod(T_1) +
+    tcrossprod(T_mat[3, ])
+  J_hand <- (J_hand + t(J_hand)) / 2
+
+  expect_equal(Jc, J_hand, tolerance = 1e-12)
+})
+
+test_that("cluster spanning two strata errors", {
+  N <- 8L; p <- 1L; J <- 1L
+  X <- matrix(1, N, p)
+  r <- rnorm(N)
+  group   <- rep(1L, N)
+  cluster <- rep(1:2, each = 4)
+  strata  <- c(1, 1, 2, 2, 2, 2, 2, 2)  # cluster 1 straddles strata 1 and 2
+
+  expect_error(
+    svyder:::.build_J_cluster(X, r, cluster, group, p, J,
+                              strata = strata),
+    "exactly one stratum"
+  )
 })
 
 
@@ -237,7 +385,7 @@ test_that("V_sand = H_inv J H_inv identity", {
   H_inv <- solve(H)
 
   Jc <- svyder:::.build_J_cluster(
-    X = fix$X, r = r, psu = fix$psu, group = fix$group,
+    X = fix$X, r = r, cluster = fix$psu, group = fix$group,
     p = fix$p, J = fix$J
   )
 
@@ -266,7 +414,7 @@ test_that("V_sand is symmetric", {
   H_inv <- solve(H)
 
   Jc <- svyder:::.build_J_cluster(
-    X = fix$X, r = r, psu = fix$psu, group = fix$group,
+    X = fix$X, r = r, cluster = fix$psu, group = fix$group,
     p = fix$p, J = fix$J
   )
 
@@ -289,7 +437,7 @@ test_that("V_sand has non-negative diagonal", {
   H_inv <- solve(H)
 
   Jc <- svyder:::.build_J_cluster(
-    X = fix$X, r = r, psu = fix$psu, group = fix$group,
+    X = fix$X, r = r, cluster = fix$psu, group = fix$group,
     p = fix$p, J = fix$J
   )
 
@@ -350,7 +498,8 @@ test_that("safe_invert returns correct result for diagonal matrix", {
 
 test_that("full sandwich pipeline matches standalone code output", {
   # Use the unbalanced binomial fixture to test exact match
-  # with the standalone compute_der.R logic
+  # with the standalone compute_der.R logic (v1 = uncentered, no DF
+  # correction, single stratum -> legacy flags)
   fix <- make_unbalanced_binomial()
 
   v <- fix$v  # pre-computed: w * mu * (1 - mu)
@@ -370,8 +519,9 @@ test_that("full sandwich pipeline matches standalone code output", {
   H_inv <- svyder:::.safe_invert(H)
 
   Jc <- svyder:::.build_J_cluster(
-    X = fix$X, r = r, psu = fix$psu, group = fix$group,
-    p = fix$p, J = fix$J
+    X = fix$X, r = r, cluster = fix$psu, group = fix$group,
+    p = fix$p, J = fix$J,
+    strata = NULL, center = FALSE, df_correct = FALSE
   )
 
   V <- svyder:::.build_V_sand(H_inv, Jc)
@@ -457,7 +607,7 @@ test_that("full pipeline works for minimal J=2 fixture", {
   expect_equal(H %*% H_inv, diag(fix$d), tolerance = 1e-10)
 
   Jc <- svyder:::.build_J_cluster(
-    X = fix$X, r = r, psu = fix$psu, group = fix$group,
+    X = fix$X, r = r, cluster = fix$psu, group = fix$group,
     p = fix$p, J = fix$J
   )
 

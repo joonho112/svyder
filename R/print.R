@@ -16,6 +16,12 @@
 #'
 #' @return Invisibly returns \code{x}.
 #'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
+#'
 #' @seealso [summary.svyder()] for detailed classification output,
 #'   [tidy.svyder()] for a tidy data frame.
 #' @family svyder-methods
@@ -26,7 +32,7 @@
 #'   nsece_demo$draws,
 #'   y = nsece_demo$y, X = nsece_demo$X,
 #'   group = nsece_demo$group, weights = nsece_demo$weights,
-#'   psu = nsece_demo$psu, family = "binomial",
+#'   cluster = nsece_demo$psu, family = "binomial",
 #'   sigma_theta = nsece_demo$sigma_theta,
 #'   param_types = nsece_demo$param_types
 #' )
@@ -40,9 +46,31 @@ print.svyder <- function(x, n = 10, digits = 3, ...) {
   cat(sprintf("svyder diagnostic (%d parameters)\n", d))
   cat(sprintf("  Family: %s | N = %d | J = %d\n",
               x$family, x$n_obs, x$n_groups))
+
+  # --- Declared variance target ---
+  if (!is.null(x$target)) {
+    tg <- x$target
+    cat(sprintf(
+      "  Target: %d cluster(s)%s%s | meat: %s%s | weights: %s\n",
+      tg$cluster_n,
+      if (isTRUE(tg$cluster_is_group)) " (= model groups)" else "",
+      if (!is.null(tg$strata_n) && tg$strata_n > 1L)
+        sprintf(" in %d strata", tg$strata_n) else "",
+      if (isTRUE(tg$center)) "centered" else "uncentered",
+      if (isTRUE(tg$df_correct)) ", DF-corrected" else "",
+      tg$normalize
+    ))
+  }
+
   cat(sprintf("  DER range: [%.*f, %.*f]\n",
               digits, min(x$der),
               digits, max(x$der)))
+
+  # --- Tier III exclusions ---
+  if (!is.null(x$excluded) && nrow(x$excluded) > 0L) {
+    cat(sprintf("  Tier III (DER undefined): %s\n",
+                paste(x$excluded$param, collapse = ", ")))
+  }
 
   # --- Check if classification has been done ---
   has_classification <- "flagged" %in% names(x$classification)
@@ -103,6 +131,12 @@ print.svyder <- function(x, n = 10, digits = 3, ...) {
 #' @return A \code{data.frame} with classification details (printed and
 #'   returned invisibly).
 #'
+#' @references
+#' Lee, J., Williams, M. R., & Savitsky, T. D. (2026). Design Effect Ratios
+#' for Bayesian Survey Models: A Diagnostic Framework for Identifying
+#' Survey-Sensitive Parameters. \emph{Journal of Survey Statistics and
+#' Methodology}. Submitted.
+#'
 #' @seealso [print.svyder()] for a concise summary,
 #'   [tidy.svyder()] for a tidy data frame with posterior summaries.
 #' @family svyder-methods
@@ -113,7 +147,7 @@ print.svyder <- function(x, n = 10, digits = 3, ...) {
 #'   nsece_demo$draws,
 #'   y = nsece_demo$y, X = nsece_demo$X,
 #'   group = nsece_demo$group, weights = nsece_demo$weights,
-#'   psu = nsece_demo$psu, family = "binomial",
+#'   cluster = nsece_demo$psu, family = "binomial",
 #'   sigma_theta = nsece_demo$sigma_theta,
 #'   param_types = nsece_demo$param_types
 #' )
